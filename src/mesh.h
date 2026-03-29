@@ -44,11 +44,11 @@ public:
 
     ~Mesh()
     {
-        vkDestroyBuffer(m_device->GetDevice(), m_indexBuffer, nullptr);
-        vkFreeMemory(m_device->GetDevice(), m_indexBufferMemory, nullptr);
+        m_device->GetDevice().destroyBuffer(m_indexBuffer, nullptr);
+        m_device->GetDevice().freeMemory(m_indexBufferMemory, nullptr);
 
-        vkFreeMemory(m_device->GetDevice(), m_vertexBufferMemory, nullptr);
-        vkDestroyBuffer(m_device->GetDevice(), m_vertexBuffer, nullptr);
+        m_device->GetDevice().freeMemory(m_vertexBufferMemory, nullptr);
+        m_device->GetDevice().destroyBuffer(m_vertexBuffer, nullptr);
     }
 
 private:
@@ -92,19 +92,20 @@ private:
         }
     }
 
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+    void copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size)
     {
-        VkCommandBuffer commandBuffer = m_commandBuffer->beginSingleTimeCommands();
-        VkBufferCopy copyRegion{};
-        copyRegion.size = size;
-        vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+        vk::CommandBuffer commandBuffer = m_commandBuffer->beginSingleTimeCommands();
+        vk::BufferCopy copyRegion{
+            .size = size,
+        };
+        commandBuffer.copyBuffer(srcBuffer, dstBuffer, 1, &copyRegion);
 
         m_commandBuffer->endSingleTimeCommands(commandBuffer);
     }
 
     void createVertexBuffer()
     {
-        VkDeviceSize bufferSize = sizeof(m_vertices[0]) * m_vertices.size();
+        vk::DeviceSize bufferSize = sizeof(m_vertices[0]) * m_vertices.size();
 
         vk::Buffer stagingBuffer;
         vk::DeviceMemory stagingBufferMemory;
@@ -116,9 +117,10 @@ private:
                                stagingBufferMemory);
 
         void* data;
-        vkMapMemory(m_device->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+        [[maybe_unused]] auto ignored =
+            m_device->GetDevice().mapMemory(stagingBufferMemory, 0, bufferSize, {}, &data);
         memcpy(data, m_vertices.data(), (size_t)bufferSize);
-        vkUnmapMemory(m_device->GetDevice(), stagingBufferMemory);
+        m_device->GetDevice().unmapMemory(stagingBufferMemory);
 
         m_device->createBuffer(
             bufferSize,
@@ -128,13 +130,13 @@ private:
             m_vertexBufferMemory);
         copyBuffer(stagingBuffer, m_vertexBuffer, bufferSize);
 
-        vkDestroyBuffer(m_device->GetDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(m_device->GetDevice(), stagingBufferMemory, nullptr);
+        m_device->GetDevice().destroyBuffer(stagingBuffer, nullptr);
+        m_device->GetDevice().freeMemory(stagingBufferMemory, nullptr);
     }
 
     void createIndexBuffer()
     {
-        VkDeviceSize bufferSize = sizeof(m_indices[0]) * m_indices.size();
+        vk::DeviceSize bufferSize = sizeof(m_indices[0]) * m_indices.size();
 
         vk::Buffer stagingBuffer;
         vk::DeviceMemory stagingBufferMemory;
@@ -146,9 +148,10 @@ private:
                                stagingBufferMemory);
 
         void* data;
-        vkMapMemory(m_device->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+        [[maybe_unused]] auto ignored =
+            m_device->GetDevice().mapMemory(stagingBufferMemory, 0, bufferSize, {}, &data);
         memcpy(data, m_indices.data(), (size_t)bufferSize);
-        vkUnmapMemory(m_device->GetDevice(), stagingBufferMemory);
+        m_device->GetDevice().unmapMemory(stagingBufferMemory);
 
         m_device->createBuffer(bufferSize,
                                vk::BufferUsageFlagBits::eTransferDst |
@@ -159,8 +162,8 @@ private:
 
         copyBuffer(stagingBuffer, m_indexBuffer, bufferSize);
 
-        vkDestroyBuffer(m_device->GetDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(m_device->GetDevice(), stagingBufferMemory, nullptr);
+        m_device->GetDevice().destroyBuffer(stagingBuffer, nullptr);
+        m_device->GetDevice().freeMemory(stagingBufferMemory, nullptr);
     }
 
     std::shared_ptr<Device> m_device;

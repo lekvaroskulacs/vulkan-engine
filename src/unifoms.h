@@ -28,14 +28,14 @@ public:
     {
         for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            vkDestroyBuffer(m_device->GetDevice(), m_uniformBuffers[i], nullptr);
-            vkFreeMemory(m_device->GetDevice(), m_uniformBuffersMemory[i], nullptr);
+            m_device->GetDevice().destroyBuffer(m_uniformBuffers[i], nullptr);
+            m_device->GetDevice().freeMemory(m_uniformBuffersMemory[i], nullptr);
         }
     }
 
     void createUniformBuffers()
     {
-        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+        vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
 
         m_uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         m_uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
@@ -50,12 +50,8 @@ public:
                                    m_uniformBuffers[i],
                                    m_uniformBuffersMemory[i]);
 
-            vkMapMemory(m_device->GetDevice(),
-                        m_uniformBuffersMemory[i],
-                        0,
-                        bufferSize,
-                        0,
-                        &m_uniformBuffersMapped[i]);
+            [[maybe_unused]] auto ignored = m_device->GetDevice().mapMemory(
+                m_uniformBuffersMemory[i], 0, bufferSize, {}, &m_uniformBuffersMapped[i]);
         }
     }
 

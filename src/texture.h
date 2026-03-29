@@ -11,12 +11,12 @@ namespace engine
 class Texture
 {
 public:
-    VkImageView GetImageView() const
+    vk::ImageView GetImageView() const
     {
         return m_textureImageView;
     }
 
-    VkSampler GetSampler() const
+    vk::Sampler GetSampler() const
     {
         return m_textureSampler;
     }
@@ -36,40 +36,39 @@ public:
 
     ~Texture()
     {
-        vkDestroySampler(m_device->GetDevice(), m_textureSampler, nullptr);
-        vkDestroyImageView(m_device->GetDevice(), m_textureImageView, nullptr);
+        m_device->GetDevice().destroySampler(m_textureSampler, nullptr);
+        m_device->GetDevice().destroyImageView(m_textureImageView, nullptr);
 
-        vkDestroyImage(m_device->GetDevice(), m_textureImage, nullptr);
-        vkFreeMemory(m_device->GetDevice(), m_textureImageMemory, nullptr);
+        m_device->GetDevice().destroyImage(m_textureImage, nullptr);
+        m_device->GetDevice().freeMemory(m_textureImageMemory, nullptr);
     }
 
 private:
     void createTextureSampler()
     {
-        VkSamplerCreateInfo samplerInfo{};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        vk::PhysicalDeviceProperties properties{};
+        m_device->GetPhysicalDevice().getProperties(&properties);
 
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        vk::SamplerCreateInfo samplerInfo{
+            .magFilter = vk::Filter::eLinear,
+            .minFilter = vk::Filter::eLinear,
+            .mipmapMode = vk::SamplerMipmapMode::eLinear,
+            .addressModeU = vk::SamplerAddressMode::eRepeat,
+            .addressModeV = vk::SamplerAddressMode::eRepeat,
+            .addressModeW = vk::SamplerAddressMode::eRepeat,
+            .mipLodBias = 0.0f,
+            .anisotropyEnable = vk::True,
+            .maxAnisotropy = properties.limits.maxSamplerAnisotropy,
+            .compareEnable = vk::False,
+            .compareOp = vk::CompareOp::eAlways,
+            .minLod = 0.0f,
+            .maxLod = 0.0f,
+            .borderColor = vk::BorderColor::eIntOpaqueBlack,
+            .unnormalizedCoordinates = vk::False,
+        };
 
-        VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(m_device->GetPhysicalDevice(), &properties);
-        samplerInfo.anisotropyEnable = VK_TRUE;
-        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        if(vkCreateSampler(m_device->GetDevice(), &samplerInfo, nullptr, &m_textureSampler) !=
-           VK_SUCCESS)
+        if(m_device->GetDevice().createSampler(&samplerInfo, nullptr, &m_textureSampler) !=
+           vk::Result::eSuccess)
         {
             throw std::runtime_error("failed to create texture sampler!");
         }
@@ -86,7 +85,7 @@ private:
         int texWidth, texHeight, texChannels;
         stbi_uc* pixels =
             stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
+        vk::DeviceSize imageSize = texWidth * texHeight * 4;
 
         if(!pixels)
         {
@@ -103,9 +102,10 @@ private:
                                stagingBufferMemory);
 
         void* data;
-        vkMapMemory(m_device->GetDevice(), stagingBufferMemory, 0, imageSize, 0, &data);
+        [[maybe_unused]] auto ignored =
+            m_device->GetDevice().mapMemory(stagingBufferMemory, 0, imageSize, {}, &data);
         memcpy(data, pixels, static_cast<size_t>(imageSize));
-        vkUnmapMemory(m_device->GetDevice(), stagingBufferMemory);
+        m_device->GetDevice().unmapMemory(stagingBufferMemory);
 
         stbi_image_free(pixels);
 
@@ -120,100 +120,99 @@ private:
                                  m_textureImageMemory);
 
         transitionImageLayout(m_textureImage,
-                              VK_FORMAT_R8G8B8A8_SRGB,
-                              VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        //transitionImageLayout(m_textureImage,
-        //                      vk::Format::eR8G8B8A8Srgb,
-        //                      vk::ImageLayout::eUndefined,
-        //                      vk::ImageLayout::eTransferDstOptimal);
+                              vk::Format::eR8G8B8A8Srgb,
+                              vk::ImageLayout::eUndefined,
+                              vk::ImageLayout::eTransferDstOptimal);
 
         copyBufferToImage(stagingBuffer,
                           m_textureImage,
                           static_cast<uint32_t>(texWidth),
                           static_cast<uint32_t>(texHeight));
         transitionImageLayout(m_textureImage,
-                              VK_FORMAT_R8G8B8A8_SRGB,
-                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                              vk::Format::eR8G8B8A8Srgb,
+                              vk::ImageLayout::eTransferDstOptimal,
+                              vk::ImageLayout::eShaderReadOnlyOptimal);
 
-        vkDestroyBuffer(m_device->GetDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(m_device->GetDevice(), stagingBufferMemory, nullptr);
+        m_device->GetDevice().destroyBuffer(stagingBuffer, nullptr);
+        m_device->GetDevice().freeMemory(stagingBufferMemory, nullptr);
     }
 
-    void transitionImageLayout(VkImage image,
-                               VkFormat format,
-                               VkImageLayout oldLayout,
-                               VkImageLayout newLayout)
+    void transitionImageLayout(vk::Image image,
+                               vk::Format format,
+                               vk::ImageLayout oldLayout,
+                               vk::ImageLayout newLayout)
     {
-        VkCommandBuffer commandBuffer = m_commandBuffer->beginSingleTimeCommands();
+        vk::CommandBuffer commandBuffer = m_commandBuffer->beginSingleTimeCommands();
 
-        VkImageMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = oldLayout;
-        barrier.newLayout = newLayout;
+        vk::ImageSubresourceRange subresourceRange{
+            .aspectMask = vk::ImageAspectFlagBits::eColor,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        };
+        vk::ImageMemoryBarrier barrier{
+            .oldLayout = oldLayout,
+            .newLayout = newLayout,
+            .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+            .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+            .image = image,
+            .subresourceRange = subresourceRange,
+        };
 
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        vk::PipelineStageFlags sourceStage;
+        vk::PipelineStageFlags destinationStage;
 
-        barrier.image = image;
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = 1;
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
-
-        VkPipelineStageFlags sourceStage;
-        VkPipelineStageFlags destinationStage;
-
-        if(oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-           newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        if(oldLayout == vk::ImageLayout::eUndefined &&
+           newLayout == vk::ImageLayout::eTransferDstOptimal)
         {
-            barrier.srcAccessMask = 0;
-            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.srcAccessMask = {};
+            barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
 
-            sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
+            destinationStage = vk::PipelineStageFlagBits::eTransfer;
         }
-        else if(oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-                newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        else if(oldLayout == vk::ImageLayout::eTransferDstOptimal &&
+                newLayout == vk::ImageLayout::eShaderReadOnlyOptimal)
         {
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+            barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 
-            sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            sourceStage = vk::PipelineStageFlagBits::eTransfer;
+            destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
         }
         else
         {
             throw std::invalid_argument("unsupported layout transition!");
         }
 
-        vkCmdPipelineBarrier(
-            commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+        commandBuffer.pipelineBarrier(
+            sourceStage, destinationStage, {}, 0, nullptr, 0, nullptr, 1, &barrier);
 
         m_commandBuffer->endSingleTimeCommands(commandBuffer);
     }
 
-    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+    void copyBufferToImage(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height)
     {
-        VkCommandBuffer commandBuffer = m_commandBuffer->beginSingleTimeCommands();
+        vk::CommandBuffer commandBuffer = m_commandBuffer->beginSingleTimeCommands();
 
-        VkBufferImageCopy region{};
-        region.bufferOffset = 0;
-        region.bufferRowLength = 0;
-        region.bufferImageHeight = 0;
+        vk::ImageSubresourceLayers subresource{
+            .aspectMask = vk::ImageAspectFlagBits::eColor,
+            .mipLevel = 0,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        };
+        vk::BufferImageCopy region{
+            .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource = subresource,
+            .imageOffset = {0, 0, 0},
+            .imageExtent = {width, height, 1},
+        };
 
-        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        region.imageSubresource.mipLevel = 0;
-        region.imageSubresource.baseArrayLayer = 0;
-        region.imageSubresource.layerCount = 1;
-
-        region.imageOffset = {0, 0, 0};
-        region.imageExtent = {width, height, 1};
-
-        vkCmdCopyBufferToImage(
-            commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        commandBuffer.copyBufferToImage(
+            buffer, image, vk::ImageLayout::eTransferDstOptimal, 1, &region);
 
         m_commandBuffer->endSingleTimeCommands(commandBuffer);
     }
@@ -224,8 +223,8 @@ private:
 
     vk::Image m_textureImage;
     vk::DeviceMemory m_textureImageMemory;
-    VkImageView m_textureImageView;
-    VkSampler m_textureSampler;
+    vk::ImageView m_textureImageView;
+    vk::Sampler m_textureSampler;
 };
 
 } // namespace engine

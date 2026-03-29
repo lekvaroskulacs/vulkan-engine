@@ -32,13 +32,13 @@ public:
     {
         for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            vkDestroySemaphore(m_device->GetDevice(), m_imageAvailableSemaphores[i], nullptr);
-            vkDestroyFence(m_device->GetDevice(), m_inFlightFences[i], nullptr);
+            m_device->GetDevice().destroySemaphore(m_imageAvailableSemaphores[i], nullptr);
+            m_device->GetDevice().destroyFence(m_inFlightFences[i], nullptr);
         }
 
         for(size_t i = 0; i < m_renderFinishedSemaphores.size(); i++)
         {
-            vkDestroySemaphore(m_device->GetDevice(), m_renderFinishedSemaphores[i], nullptr);
+            m_device->GetDevice().destroySemaphore(m_renderFinishedSemaphores[i], nullptr);
         }
     }
 
@@ -48,103 +48,102 @@ public:
         app->m_framebufferResized = true;
     }
 
-    void recordCommandBuffer(VkCommandBuffer commandBuffer,
+    void recordCommandBuffer(vk::CommandBuffer commandBuffer,
                              uint32_t imageIndex,
                              const Pipeline& pipeline,
                              const Mesh& mesh,
                              const DescriptorSets& descriptorSets)
     {
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = 0;
-        beginInfo.pInheritanceInfo = nullptr;
+        vk::CommandBufferBeginInfo beginInfo{
+            .flags = {},
+            .pInheritanceInfo = nullptr,
+        };
 
-        if(vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+        if(commandBuffer.begin(&beginInfo) != vk::Result::eSuccess)
         {
             throw std::runtime_error("Failed to begin recording command buffer");
         }
 
-        VkRenderPassBeginInfo renderPassInfo{};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = m_swapChain->GetRenderPass();
-        renderPassInfo.framebuffer = m_swapChain->GetFrameBuffers()[imageIndex];
-        renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = m_swapChain->GetExtent();
+        std::array<vk::ClearValue, 2> clearValues{};
+        clearValues[0].color = vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f});
+        clearValues[1].depthStencil = vk::ClearDepthStencilValue{1.0f, 0};
 
-        std::array<VkClearValue, 2> clearValues{};
-        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-        clearValues[1].depthStencil = {1.0f, 0};
+        vk::Rect2D renderArea{
+            .offset = {0, 0},
+            .extent = m_swapChain->GetExtent(),
+        };
+        vk::RenderPassBeginInfo renderPassInfo{
+            .renderPass = m_swapChain->GetRenderPass(),
+            .framebuffer = m_swapChain->GetFrameBuffers()[imageIndex],
+            .renderArea = renderArea,
+            .clearValueCount = static_cast<uint32_t>(clearValues.size()),
+            .pClearValues = clearValues.data(),
+        };
 
-        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-        renderPassInfo.pClearValues = clearValues.data();
+        commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.Get());
 
-        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Get());
+        vk::Viewport viewport{
+            .x = 0.0f,
+            .y = 0.0f,
+            .width = static_cast<float>(m_swapChain->GetExtent().width),
+            .height = static_cast<float>(m_swapChain->GetExtent().height),
+            .minDepth = 0.0f,
+            .maxDepth = 1.0f,
+        };
+        commandBuffer.setViewport(0, 1, &viewport);
 
-        VkViewport viewport{};
-        viewport.x = 0.0f;
-        viewport.y = 0.0f;
-        viewport.width = static_cast<float>(m_swapChain->GetExtent().width);
-        viewport.height = static_cast<float>(m_swapChain->GetExtent().height);
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vk::Rect2D scissor{
+            .offset = {0, 0},
+            .extent = m_swapChain->GetExtent(),
+        };
+        commandBuffer.setScissor(0, 1, &scissor);
 
-        VkRect2D scissor{};
-        scissor.offset = {0, 0};
-        scissor.extent = m_swapChain->GetExtent();
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        vk::Buffer vertexBuffers[] = {mesh.GetVertexBuffer()};
+        vk::DeviceSize offsets[] = {0};
+        commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
 
-        VkBuffer vertexBuffers[] = {mesh.GetVertexBuffer()};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        commandBuffer.bindIndexBuffer(mesh.GetIndexBuffer(), 0, vk::IndexType::eUint32);
 
-        vkCmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                         pipeline.GetLayout(),
+                                         0,
+                                         1,
+                                         &descriptorSets.m_descriptorSets[m_currentFrame],
+                                         0,
+                                         nullptr);
+        commandBuffer.drawIndexed(static_cast<uint32_t>(mesh.GetIndices().size()), 1, 0, 0, 0);
 
-        vkCmdBindDescriptorSets(commandBuffer,
-                                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                pipeline.GetLayout(),
-                                0,
-                                1,
-                                &descriptorSets.m_descriptorSets[m_currentFrame],
-                                0,
-                                nullptr);
-        vkCmdDrawIndexed(
-            commandBuffer, static_cast<uint32_t>(mesh.GetIndices().size()), 1, 0, 0, 0);
+        commandBuffer.endRenderPass();
 
-        vkCmdEndRenderPass(commandBuffer);
-
-        if(vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
-        {
-            throw std::runtime_error("Failed to record command buffer");
-        }
+        commandBuffer.end(); // Why is result lost with vulkan.hpp?
     }
 
     void drawFrame(DrawFrameParams& params)
     {
-        vkWaitForFences(
-            m_device->GetDevice(), 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+        [[maybe_unused]] auto ignored = m_device->GetDevice().waitForFences(
+            1, &m_inFlightFences[m_currentFrame], vk::True, UINT64_MAX);
 
         uint32_t imageIndex;
-        VkResult result = vkAcquireNextImageKHR(m_device->GetDevice(),
-                                                m_swapChain->Get(),
-                                                UINT64_MAX,
-                                                m_imageAvailableSemaphores[m_currentFrame],
-                                                VK_NULL_HANDLE,
-                                                &imageIndex);
+        vk::Result result =
+            m_device->GetDevice().acquireNextImageKHR(m_swapChain->Get(),
+                                                      UINT64_MAX,
+                                                      m_imageAvailableSemaphores[m_currentFrame],
+                                                      VK_NULL_HANDLE,
+                                                      &imageIndex);
 
-        if(result == VK_ERROR_OUT_OF_DATE_KHR)
+        if(result == vk::Result::eErrorOutOfDateKHR)
         {
             m_swapChain->recreateSwapChain();
             return;
         }
-        else if(result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+        else if(result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
         {
             throw std::runtime_error("Failed to acquire swap chain image!");
         }
 
-        vkResetFences(m_device->GetDevice(), 1, &m_inFlightFences[m_currentFrame]);
-        vkResetCommandBuffer(m_commandBuffers->GetBuffers()[m_currentFrame], 0);
+        ignored = m_device->GetDevice().resetFences(1, &m_inFlightFences[m_currentFrame]);
+        m_commandBuffers->GetBuffers()[m_currentFrame].reset();
         recordCommandBuffer(m_commandBuffers->GetBuffers()[m_currentFrame],
                             imageIndex,
                             params.m_pipeline,
@@ -153,48 +152,45 @@ public:
 
         updateUniformBuffer(m_currentFrame, params.m_uniforms);
 
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        vk::Semaphore waitSemaphores[] = {m_imageAvailableSemaphores[m_currentFrame]};
+        vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+        vk::Semaphore signalSemaphores[] = {m_renderFinishedSemaphores[imageIndex]};
 
-        VkSemaphore waitSemaphores[] = {m_imageAvailableSemaphores[m_currentFrame]};
-        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = waitSemaphores;
-        submitInfo.pWaitDstStageMask = waitStages;
+        vk::SubmitInfo submitInfo{
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = waitSemaphores,
+            .pWaitDstStageMask = waitStages,
+            .commandBufferCount = 1,
+            .pCommandBuffers = m_commandBuffers->GetBufferPtr(m_currentFrame),
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = signalSemaphores,
+        };
 
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = m_commandBuffers->GetBufferPtr(m_currentFrame);
-
-        VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphores[imageIndex]};
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = signalSemaphores;
-
-        if(vkQueueSubmit(
-               m_device->GetGraphicsQueue(), 1, &submitInfo, m_inFlightFences[m_currentFrame]) !=
-           VK_SUCCESS)
+        if(m_device->GetGraphicsQueue().submit(1, &submitInfo, m_inFlightFences[m_currentFrame]) !=
+           vk::Result::eSuccess)
         {
             throw std::runtime_error("Failed to submit draw command buffer!");
         }
 
-        VkPresentInfoKHR presentInfo{};
-        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = signalSemaphores;
+        vk::SwapchainKHR swapChains[] = {m_swapChain->Get()};
 
-        VkSwapchainKHR swapChains[] = {m_swapChain->Get()};
-        presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = swapChains;
-        presentInfo.pImageIndices = &imageIndex;
-        presentInfo.pResults = nullptr;
+        vk::PresentInfoKHR presentInfo{
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = signalSemaphores,
+            .swapchainCount = 1,
+            .pSwapchains = swapChains,
+            .pImageIndices = &imageIndex,
+            .pResults = nullptr,
+        };
 
-        result = vkQueuePresentKHR(m_device->GetPresentQueue(), &presentInfo);
+        result = m_device->GetPresentQueue().presentKHR(&presentInfo);
 
-        if(result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
+        if(result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR ||
            m_framebufferResized)
         {
             m_swapChain->recreateSwapChain();
         }
-        else if(result != VK_SUCCESS)
+        else if(result != vk::Result::eSuccess)
         {
             throw std::runtime_error("Failed to present swap chain image!");
         }
@@ -236,21 +232,17 @@ private:
         m_renderFinishedSemaphores.resize(m_swapChain->GetImages().size());
         m_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 
-        VkSemaphoreCreateInfo semaphoreInfo{};
-        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        vk::SemaphoreCreateInfo semaphoreInfo{};
 
-        VkFenceCreateInfo fenceInfo{};
-        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        vk::FenceCreateInfo fenceInfo{.flags = vk::FenceCreateFlagBits::eSignaled};
 
         for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            if(vkCreateSemaphore(m_device->GetDevice(),
-                                 &semaphoreInfo,
-                                 nullptr,
-                                 &m_imageAvailableSemaphores[i]) != VK_SUCCESS ||
-               vkCreateFence(m_device->GetDevice(), &fenceInfo, nullptr, &m_inFlightFences[i]) !=
-                   VK_SUCCESS)
+            if(m_device->GetDevice().createSemaphore(
+                   &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]) !=
+                   vk::Result::eSuccess ||
+               m_device->GetDevice().createFence(&fenceInfo, nullptr, &m_inFlightFences[i]) !=
+                   vk::Result::eSuccess)
             {
 
                 throw std::runtime_error("Failed to create synchronization objects for a frame!");
@@ -259,10 +251,8 @@ private:
 
         for(size_t i = 0; i < m_renderFinishedSemaphores.size(); i++)
         {
-            if(vkCreateSemaphore(m_device->GetDevice(),
-                                 &semaphoreInfo,
-                                 nullptr,
-                                 &m_renderFinishedSemaphores[i]) != VK_SUCCESS)
+            if(m_device->GetDevice().createSemaphore(
+                   &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]) != vk::Result::eSuccess)
             {
                 throw std::runtime_error("Failed to create synchronization objects for a frame!");
             }
@@ -273,9 +263,9 @@ private:
     std::shared_ptr<SwapChain> m_swapChain;
     std::shared_ptr<CommandBuffer> m_commandBuffers;
 
-    std::vector<VkSemaphore> m_imageAvailableSemaphores;
-    std::vector<VkSemaphore> m_renderFinishedSemaphores;
-    std::vector<VkFence> m_inFlightFences;
+    std::vector<vk::Semaphore> m_imageAvailableSemaphores;
+    std::vector<vk::Semaphore> m_renderFinishedSemaphores;
+    std::vector<vk::Fence> m_inFlightFences;
 
     bool m_framebufferResized = false;
 

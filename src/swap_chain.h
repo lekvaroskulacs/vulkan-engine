@@ -15,7 +15,7 @@ public:
         return m_swapChain;
     }
 
-    VkExtent2D GetExtent()
+    vk::Extent2D GetExtent()
     {
         return m_swapChainExtent;
     }
