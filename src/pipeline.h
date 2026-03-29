@@ -18,12 +18,12 @@ public:
         return m_descriptorSetLayout;
     }
 
-    VkPipeline Get()
+    VkPipeline Get() const
     {
         return m_graphicsPipeline;
     }
 
-    VkPipelineLayout GetLayout()
+    VkPipelineLayout GetLayout() const
     {
         return m_pipelineLayout;
     }

@@ -11,12 +11,12 @@ namespace engine
 class Texture
 {
 public:
-    VkImageView GetImageView()
+    VkImageView GetImageView() const
     {
         return m_textureImageView;
     }
 
-    VkSampler GetSampler()
+    VkSampler GetSampler() const
     {
         return m_textureSampler;
     }
@@ -78,7 +78,7 @@ private:
     void createTextureImageView()
     {
         m_textureImageView = m_swapChain->createImageView(
-            m_textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+            m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
     }
 
     void createTextureImage()
@@ -93,12 +93,12 @@ private:
             throw std::runtime_error("Failed to load texture image!");
         }
 
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
         m_device->createBuffer(imageSize,
-                               VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                               vk::BufferUsageFlagBits::eTransferSrc,
+                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                   vk::MemoryPropertyFlagBits::eHostCoherent,
                                stagingBuffer,
                                stagingBufferMemory);
 
@@ -111,10 +111,11 @@ private:
 
         m_swapChain->createImage(texWidth,
                                  texHeight,
-                                 VK_FORMAT_R8G8B8A8_SRGB,
-                                 VK_IMAGE_TILING_OPTIMAL,
-                                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                 vk::Format::eR8G8B8A8Srgb,
+                                 vk::ImageTiling::eOptimal,
+                                 vk::ImageUsageFlagBits::eTransferDst |
+                                     vk::ImageUsageFlagBits::eSampled,
+                                 vk::MemoryPropertyFlagBits::eDeviceLocal,
                                  m_textureImage,
                                  m_textureImageMemory);
 
@@ -122,6 +123,11 @@ private:
                               VK_FORMAT_R8G8B8A8_SRGB,
                               VK_IMAGE_LAYOUT_UNDEFINED,
                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        //transitionImageLayout(m_textureImage,
+        //                      vk::Format::eR8G8B8A8Srgb,
+        //                      vk::ImageLayout::eUndefined,
+        //                      vk::ImageLayout::eTransferDstOptimal);
+
         copyBufferToImage(stagingBuffer,
                           m_textureImage,
                           static_cast<uint32_t>(texWidth),
@@ -216,8 +222,8 @@ private:
     std::shared_ptr<SwapChain> m_swapChain;
     std::shared_ptr<CommandBuffer> m_commandBuffer;
 
-    VkImage m_textureImage;
-    VkDeviceMemory m_textureImageMemory;
+    vk::Image m_textureImage;
+    vk::DeviceMemory m_textureImageMemory;
     VkImageView m_textureImageView;
     VkSampler m_textureSampler;
 };

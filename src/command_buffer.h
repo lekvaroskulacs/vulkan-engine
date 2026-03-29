@@ -72,9 +72,9 @@ public:
 private:
     void createCommandPool()
     {
-        engine::QueueFamilyIndices queueFamilyIndices =
-            engine::QueueFamilyIndices::findQueueFamilies(m_device->GetPhysicalDevice(),
-                                                          m_device->GetSurface());
+        engine::utils::QueueFamilyIndices queueFamilyIndices =
+            engine::utils::QueueFamilyIndices::findQueueFamilies(m_device->GetPhysicalDevice(),
+                                                                 m_device->GetSurface());
 
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
