@@ -24,6 +24,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <vulkan/vulkan.hpp>
+
 #include "command_buffer.h"
 #include "descriptor_sets.h"
 #include "device.h"
@@ -45,7 +47,8 @@ public:
         m_pipeline = std::make_shared<engine::Pipeline>(m_device, m_swapChain);
         m_commandBuffer = std::make_shared<engine::CommandBuffer>(m_device, m_swapChain);
         m_texture = std::make_shared<engine::Texture>(m_device, m_swapChain, m_commandBuffer);
-        m_viking_room = std::make_unique<engine::Mesh>(m_device, m_commandBuffer, MODEL_PATH);
+        m_viking_room =
+            std::make_unique<engine::Mesh>(m_device, m_commandBuffer, engine::MODEL_PATH);
         m_uniforms = std::make_shared<engine::Uniforms>(m_device);
         m_descriptor_sets =
             std::make_shared<engine::DescriptorSets>(m_device, m_pipeline, *m_uniforms, *m_texture);

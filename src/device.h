@@ -9,13 +9,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-
-#define TINYOBJLOADER_IMPLEMENTATION
-#pragma GCC system_header
-#include <tiny_obj_loader.h>
-
 #include <chrono>
 
 #include <algorithm>
@@ -34,10 +27,12 @@
 #include <vector>
 
 #include <vulkan/vulkan.hpp>
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 #include "utils.h"
 #include "window.h"
+
+namespace engine
+{
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -53,8 +48,6 @@ const bool g_enableValidationLayers = false;
 const bool g_enableValidationLayers = true;
 #endif
 
-namespace engine
-{
 class Device
 {
 public:
