@@ -24,15 +24,20 @@
 #include <unordered_map>
 #include <vector>
 
-#include "command_buffer.h"
-#include "descriptor_sets.h"
-#include "device.h"
-#include "mesh.h"
-#include "pipeline.h"
-#include "renderer.h"
-#include "swap_chain.h"
-#include "texture.h"
-#include "unifoms.h"
+#include <vulkan/vulkan.hpp>
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+#define STB_IMAGE_IMPLEMENTATION
+#define TINYOBJLOADER_IMPLEMENTATION
+
+#include "include/command_buffer.h"
+#include "include/descriptor_sets.h"
+#include "include/device.h"
+#include "include/mesh.h"
+#include "include/pipeline.h"
+#include "include/renderer.h"
+#include "include/swap_chain.h"
+#include "include/texture.h"
+#include "include/unifoms.h"
 
 class EngineApplication
 {
@@ -45,7 +50,8 @@ public:
         m_pipeline = std::make_shared<engine::Pipeline>(m_device, m_swapChain);
         m_commandBuffer = std::make_shared<engine::CommandBuffer>(m_device, m_swapChain);
         m_texture = std::make_shared<engine::Texture>(m_device, m_swapChain, m_commandBuffer);
-        m_viking_room = std::make_unique<engine::Mesh>(m_device, m_commandBuffer, MODEL_PATH);
+        m_viking_room =
+            std::make_unique<engine::Mesh>(m_device, m_commandBuffer, engine::MODEL_PATH);
         m_uniforms = std::make_shared<engine::Uniforms>(m_device);
         m_descriptor_sets =
             std::make_shared<engine::DescriptorSets>(m_device, m_pipeline, *m_uniforms, *m_texture);

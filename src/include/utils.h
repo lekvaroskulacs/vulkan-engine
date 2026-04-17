@@ -1,13 +1,17 @@
 #pragma once
 
+#include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <vector>
+
+#include <vulkan/vulkan.hpp>
 
 namespace engine::utils
 {
 
-std::vector<char> readFile(const std::string& filename)
+inline std::vector<char> readFile(const std::string& filename)
 {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
@@ -55,7 +59,7 @@ struct QueueFamilyIndices
             }
 
             vk::Bool32 presentSupport = false;
-            device.getSurfaceSupportKHR(i, surface, &presentSupport);
+            [[maybe_unused]] auto result = device.getSurfaceSupportKHR(i, surface, &presentSupport);
 
             if(presentSupport)
             {
@@ -85,22 +89,24 @@ struct SwapChainSupportDetails
     {
         SwapChainSupportDetails details;
 
-        device.getSurfaceCapabilitiesKHR(surface, &details.m_capabilities);
+        [[maybe_unused]] auto result =
+            device.getSurfaceCapabilitiesKHR(surface, &details.m_capabilities);
 
         uint32_t formatCount;
-        device.getSurfaceFormatsKHR(surface, &formatCount, nullptr);
+        result = device.getSurfaceFormatsKHR(surface, &formatCount, nullptr);
         if(formatCount != 0)
         {
             details.m_formats.resize(formatCount);
-            device.getSurfaceFormatsKHR(surface, &formatCount, details.m_formats.data());
+            result = device.getSurfaceFormatsKHR(surface, &formatCount, details.m_formats.data());
         }
 
         uint32_t presentModeCount;
-        device.getSurfacePresentModesKHR(surface, &presentModeCount, nullptr);
+        result = device.getSurfacePresentModesKHR(surface, &presentModeCount, nullptr);
         if(presentModeCount != 0)
         {
             details.m_presentModes.resize(presentModeCount);
-            device.getSurfacePresentModesKHR(surface, &formatCount, details.m_presentModes.data());
+            result = device.getSurfacePresentModesKHR(
+                surface, &formatCount, details.m_presentModes.data());
         }
 
         return details;

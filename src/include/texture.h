@@ -5,6 +5,8 @@
 
 #include "command_buffer.h"
 
+#include <stb_image.h>
+
 namespace engine
 {
 
