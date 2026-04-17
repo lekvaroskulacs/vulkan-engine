@@ -5,6 +5,9 @@
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
+#pragma GCC system_header
+#include <tiny_obj_loader.h>
+
 namespace engine
 {
 

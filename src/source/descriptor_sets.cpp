@@ -1,6 +1,6 @@
-#include "descriptor_sets.h"
-#include "device.h"
-#include "pipeline.h"
+#include "../include/descriptor_sets.h"
+#include "../include/device.h"
+#include "../include/pipeline.h"
 #include <array>
 #include <stdexcept>
 

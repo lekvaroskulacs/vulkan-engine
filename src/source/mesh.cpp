@@ -1,13 +1,9 @@
-#include "mesh.h"
-#include "device.h"
-#include "vertex.h"
+#include "../include/mesh.h"
+#include "../include/device.h"
+#include "../include/vertex.h"
 #include <cstring>
 #include <stdexcept>
 #include <unordered_map>
-
-#define TINYOBJLOADER_IMPLEMENTATION
-#pragma GCC system_header
-#include <tiny_obj_loader.h>
 
 namespace engine
 {
