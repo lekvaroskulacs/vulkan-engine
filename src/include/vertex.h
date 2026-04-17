@@ -13,8 +13,7 @@ struct Vertex
 
     static vk::VertexInputBindingDescription getBindingDescription()
     {
-        vk::VertexInputBindingDescription desc{
-            .binding = 0, .stride = sizeof(Vertex), .inputRate = vk::VertexInputRate::eVertex};
+        vk::VertexInputBindingDescription desc{.binding = 0, .stride = sizeof(Vertex), .inputRate = vk::VertexInputRate::eVertex};
 
         return desc;
     }

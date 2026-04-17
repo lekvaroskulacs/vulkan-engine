@@ -4,7 +4,7 @@
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
-#include "pipeline.h"
+#include "swap_chain.h"
 
 namespace engine
 {

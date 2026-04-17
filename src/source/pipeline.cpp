@@ -19,11 +19,14 @@ VkPipelineLayout Pipeline::GetLayout() const
     return m_pipelineLayout;
 }
 
-Pipeline::Pipeline(std::shared_ptr<Device> device, std::shared_ptr<SwapChain> swapChain)
+Pipeline::Pipeline(std::shared_ptr<Device> device,
+                   std::shared_ptr<SwapChain> swapChain,
+                   const std::vector<std::shared_ptr<Uniform>>& uniforms,
+                   const std::vector<std::shared_ptr<Texture>>& textures)
     : m_device(device)
     , m_swapChain(swapChain)
 {
-    createDescriptorSetLayout();
+    createDescriptorSetLayout(uniforms, textures);
     createGraphicsPipeline();
 }
 
@@ -34,11 +37,11 @@ Pipeline::~Pipeline()
     m_device->GetDevice().destroyPipelineLayout(m_pipelineLayout, nullptr);
 }
 
-void Pipeline::createDescriptorSetLayout()
+void Pipeline::createDescriptorSetLayout(const std::vector<std::shared_ptr<Uniform>>& uniforms,
+                                         const std::vector<std::shared_ptr<Texture>>& textures)
 {
     vk::DescriptorSetLayoutBinding uboLayoutBinding{.binding = 0,
-                                                    .descriptorType =
-                                                        vk::DescriptorType::eUniformBuffer,
+                                                    .descriptorType = vk::DescriptorType::eUniformBuffer,
                                                     .descriptorCount = 1,
                                                     .stageFlags = vk::ShaderStageFlagBits::eVertex,
                                                     .pImmutableSamplers = nullptr};
@@ -51,15 +54,13 @@ void Pipeline::createDescriptorSetLayout()
         .pImmutableSamplers = nullptr,
     };
 
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding,
-                                                              samplerLayoutBinding};
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
     vk::DescriptorSetLayoutCreateInfo layoutInfo{
         .bindingCount = static_cast<uint32_t>(bindings.size()),
         .pBindings = bindings.data(),
     };
 
-    if(m_device->GetDevice().createDescriptorSetLayout(
-           &layoutInfo, nullptr, &m_descriptorSetLayout) != vk::Result::eSuccess)
+    if(m_device->GetDevice().createDescriptorSetLayout(&layoutInfo, nullptr, &m_descriptorSetLayout) != vk::Result::eSuccess)
     {
         throw std::runtime_error("failed to create descriptor set layout!");
     }
@@ -73,8 +74,7 @@ vk::ShaderModule Pipeline::createShaderModule(const std::vector<char>& code)
     };
 
     vk::ShaderModule shaderModule;
-    if(m_device->GetDevice().createShaderModule(&createInfo, nullptr, &shaderModule) !=
-       vk::Result::eSuccess)
+    if(m_device->GetDevice().createShaderModule(&createInfo, nullptr, &shaderModule) != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to create shader module!");
     }
@@ -98,24 +98,21 @@ void Pipeline::createGraphicsPipeline()
 
     vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-    std::vector<vk::DynamicState> dynamicStates = {vk::DynamicState::eViewport,
-                                                   vk::DynamicState::eScissor};
+    std::vector<vk::DynamicState> dynamicStates = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
 
-    vk::PipelineDynamicStateCreateInfo dynamicState{.dynamicStateCount =
-                                                        static_cast<uint32_t>(dynamicStates.size()),
+    vk::PipelineDynamicStateCreateInfo dynamicState{.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
                                                     .pDynamicStates = dynamicStates.data()};
 
     auto bindingDesc = Vertex::getBindingDescription();
     auto attribDesc = Vertex::getAttributeDescriptions();
 
-    vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
-        .vertexBindingDescriptionCount = 1,
-        .pVertexBindingDescriptions = &bindingDesc,
-        .vertexAttributeDescriptionCount = static_cast<uint32_t>(attribDesc.size()),
-        .pVertexAttributeDescriptions = attribDesc.data()};
+    vk::PipelineVertexInputStateCreateInfo vertexInputInfo{.vertexBindingDescriptionCount = 1,
+                                                           .pVertexBindingDescriptions = &bindingDesc,
+                                                           .vertexAttributeDescriptionCount = static_cast<uint32_t>(attribDesc.size()),
+                                                           .pVertexAttributeDescriptions = attribDesc.data()};
 
-    vk::PipelineInputAssemblyStateCreateInfo inputAssembly{
-        .topology = vk::PrimitiveTopology::eTriangleList, .primitiveRestartEnable = vk::False};
+    vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = vk::PrimitiveTopology::eTriangleList,
+                                                           .primitiveRestartEnable = vk::False};
 
     vk::Viewport viewport{
         .x = 0.0f,
@@ -155,16 +152,16 @@ void Pipeline::createGraphicsPipeline()
         .alphaToOneEnable = vk::False,
     };
 
-    vk::PipelineColorBlendAttachmentState colorBlendAttachment{
-        .blendEnable = vk::False,
-        .srcColorBlendFactor = vk::BlendFactor::eOne,
-        .dstColorBlendFactor = vk::BlendFactor::eZero,
-        .colorBlendOp = vk::BlendOp::eAdd,
-        .srcAlphaBlendFactor = vk::BlendFactor::eOne,
-        .dstAlphaBlendFactor = vk::BlendFactor::eZero,
-        .alphaBlendOp = vk::BlendOp::eAdd,
-        .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-                          vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA};
+    vk::PipelineColorBlendAttachmentState colorBlendAttachment{.blendEnable = vk::False,
+                                                               .srcColorBlendFactor = vk::BlendFactor::eOne,
+                                                               .dstColorBlendFactor = vk::BlendFactor::eZero,
+                                                               .colorBlendOp = vk::BlendOp::eAdd,
+                                                               .srcAlphaBlendFactor = vk::BlendFactor::eOne,
+                                                               .dstAlphaBlendFactor = vk::BlendFactor::eZero,
+                                                               .alphaBlendOp = vk::BlendOp::eAdd,
+                                                               .colorWriteMask =
+                                                                   vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                                                                   vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA};
 
     vk::PipelineColorBlendStateCreateInfo colorBlending{
         .logicOpEnable = vk::False,
@@ -184,8 +181,7 @@ void Pipeline::createGraphicsPipeline()
         .pPushConstantRanges = nullptr,
     };
 
-    if(m_device->GetDevice().createPipelineLayout(
-           &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != vk::Result::eSuccess)
+    if(m_device->GetDevice().createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_pipelineLayout) != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to create pipeline layout!");
     }
@@ -220,8 +216,7 @@ void Pipeline::createGraphicsPipeline()
         .basePipelineIndex = -1,
     };
 
-    if(m_device->GetDevice().createGraphicsPipelines(
-           {}, 1, &pipelineInfo, nullptr, &m_graphicsPipeline) != vk::Result::eSuccess)
+    if(m_device->GetDevice().createGraphicsPipelines({}, 1, &pipelineInfo, nullptr, &m_graphicsPipeline) != vk::Result::eSuccess)
     {
         throw std::runtime_error("failed to create graphics pipeline!");
     }

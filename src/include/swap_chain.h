@@ -27,24 +27,19 @@ public:
                      vk::MemoryPropertyFlags properties,
                      vk::Image& image,
                      vk::DeviceMemory& imageMemory);
-    vk::ImageView
-    createImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags);
+    vk::ImageView createImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags);
     void recreateSwapChain();
 
 private:
-    vk::SurfaceFormatKHR
-    chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats);
-    vk::PresentModeKHR
-    chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes);
+    vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats);
+    vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes);
     vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities);
     void createSwapChain();
     void createImageViews();
     void createRenderPass();
     void createFrameBuffers();
     void createDepthResources();
-    vk::Format findSupportedFormat(const std::vector<vk::Format>& candidates,
-                                   vk::ImageTiling tiling,
-                                   vk::FormatFeatureFlags features);
+    vk::Format findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
     vk::Format findDepthFormat();
     void cleanupSwapChain();
 

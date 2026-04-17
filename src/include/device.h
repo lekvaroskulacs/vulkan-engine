@@ -35,7 +35,6 @@ namespace engine
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 const std::string MODEL_PATH = "models/viking_room.obj";
-const std::string TEXTURE_PATH = "textures/viking_room.png";
 
 extern const std::vector<const char*> g_validationLayers;
 extern const std::vector<const char*> g_deviceExtensions;
@@ -61,11 +60,10 @@ public:
                       vk::DeviceMemory& bufferMemory);
 
 private:
-    static VKAPI_ATTR vk::Bool32 VKAPI_CALL
-    debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                  vk::DebugUtilsMessageTypeFlagsEXT messageType,
-                  const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
-                  void* pUserData);
+    static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                                          vk::DebugUtilsMessageTypeFlagsEXT messageType,
+                                                          const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
+                                                          void* pUserData);
 
     void populateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoEXT& createInfo);
     void setupDebugMessenger();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "command_buffer.h"
+#include "vertex.h"
 #include <memory>
 #include <vector>
 #include <vulkan/vulkan.hpp>
@@ -19,9 +20,7 @@ public:
     VkBuffer GetVertexBuffer() const;
     VkBuffer GetIndexBuffer() const;
 
-    explicit Mesh(std::shared_ptr<Device> device,
-                  std::shared_ptr<CommandBuffer> commandBuffer,
-                  std::string modelPath);
+    explicit Mesh(std::shared_ptr<Device> device, std::shared_ptr<CommandBuffer> commandBuffer, std::string modelPath);
     ~Mesh();
 
 private:

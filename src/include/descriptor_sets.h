@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pipeline.h"
 #include "texture.h"
 #include "unifoms.h"
 #include <memory>
@@ -14,13 +15,15 @@ class DescriptorSets
 public:
     explicit DescriptorSets(std::shared_ptr<Device> device,
                             std::shared_ptr<Pipeline> pipeline,
-                            const Uniforms& uniforms,
-                            const Texture& textures);
+                            const std::vector<std::shared_ptr<Uniform>>& uniforms,
+                            const std::vector<std::shared_ptr<Texture>>& textures);
     ~DescriptorSets();
 
     void createDescriptor();
-    void createDescriptorPool();
-    void createDescriptorSets(const Uniforms& uniforms, const Texture& textures);
+    void createDescriptorPool(const std::vector<std::shared_ptr<Uniform>>& uniforms,
+                              const std::vector<std::shared_ptr<Texture>>& textures);
+    void createDescriptorSets(const std::vector<std::shared_ptr<Uniform>>& uniforms,
+                              const std::vector<std::shared_ptr<Texture>>& textures);
 
     vk::DescriptorPool m_descriptorPool;
     std::vector<vk::DescriptorSet> m_descriptorSets;

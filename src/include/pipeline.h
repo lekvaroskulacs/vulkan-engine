@@ -5,6 +5,8 @@
 #include <vulkan/vulkan.hpp>
 
 #include "swap_chain.h"
+#include "texture.h"
+#include "unifoms.h"
 #include "utils.h"
 #include "vertex.h"
 
@@ -18,11 +20,15 @@ public:
     VkPipeline Get() const;
     VkPipelineLayout GetLayout() const;
 
-    explicit Pipeline(std::shared_ptr<Device> device, std::shared_ptr<SwapChain> swapChain);
+    explicit Pipeline(std::shared_ptr<Device> device,
+                      std::shared_ptr<SwapChain> swapChain,
+                      const std::vector<std::shared_ptr<Uniform>>& uniforms,
+                      const std::vector<std::shared_ptr<Texture>>& textures);
     ~Pipeline();
 
 private:
-    void createDescriptorSetLayout();
+    void createDescriptorSetLayout(const std::vector<std::shared_ptr<Uniform>>& uniforms,
+                                   const std::vector<std::shared_ptr<Texture>>& textures);
     vk::ShaderModule createShaderModule(const std::vector<char>& code);
     void createGraphicsPipeline();
 

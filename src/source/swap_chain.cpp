@@ -73,32 +73,23 @@ void SwapChain::createImage(uint32_t width,
     }
     vk::MemoryRequirements memRequirements;
     m_device->GetDevice().getImageMemoryRequirements(image, &memRequirements);
-    vk::MemoryAllocateInfo allocInfo{
-        .allocationSize = memRequirements.size,
-        .memoryTypeIndex = m_device->findMemoryType(memRequirements.memoryTypeBits, properties)};
-    if(m_device->GetDevice().allocateMemory(&allocInfo, nullptr, &imageMemory) !=
-       vk::Result::eSuccess)
+    vk::MemoryAllocateInfo allocInfo{.allocationSize = memRequirements.size,
+                                     .memoryTypeIndex = m_device->findMemoryType(memRequirements.memoryTypeBits, properties)};
+    if(m_device->GetDevice().allocateMemory(&allocInfo, nullptr, &imageMemory) != vk::Result::eSuccess)
     {
         throw std::runtime_error("failed to allocate image memory!");
     }
     m_device->GetDevice().bindImageMemory(image, imageMemory, 0);
 }
 
-vk::ImageView
-SwapChain::createImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags)
+vk::ImageView SwapChain::createImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags)
 {
-    vk::ImageSubresourceRange subresourceRange{.aspectMask = aspectFlags,
-                                               .baseMipLevel = 0,
-                                               .levelCount = 1,
-                                               .baseArrayLayer = 0,
-                                               .layerCount = 1};
-    vk::ImageViewCreateInfo viewInfo{.image = image,
-                                     .viewType = vk::ImageViewType::e2D,
-                                     .format = format,
-                                     .subresourceRange = subresourceRange};
+    vk::ImageSubresourceRange subresourceRange{
+        .aspectMask = aspectFlags, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
+    vk::ImageViewCreateInfo viewInfo{
+        .image = image, .viewType = vk::ImageViewType::e2D, .format = format, .subresourceRange = subresourceRange};
     vk::ImageView imageView;
-    if(m_device->GetDevice().createImageView(&viewInfo, nullptr, &imageView) !=
-       vk::Result::eSuccess)
+    if(m_device->GetDevice().createImageView(&viewInfo, nullptr, &imageView) != vk::Result::eSuccess)
     {
         throw std::runtime_error("failed to create image view!");
     }
@@ -122,13 +113,11 @@ void SwapChain::recreateSwapChain()
     createFrameBuffers();
 }
 
-vk::SurfaceFormatKHR
-SwapChain::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats)
+vk::SurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats)
 {
     for(const auto& availableFormat : availableFormats)
     {
-        if(availableFormat.format == vk::Format::eB8G8R8A8Srgb &&
-           availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
+        if(availableFormat.format == vk::Format::eB8G8R8A8Srgb && availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
         {
             return availableFormat;
         }
@@ -137,8 +126,7 @@ SwapChain::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& avai
     return availableFormats[0];
 }
 
-vk::PresentModeKHR
-SwapChain::chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes)
+vk::PresentModeKHR SwapChain::chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes)
 {
     for(const auto& availablePresentMode : availablePresentModes)
     {
@@ -163,12 +151,8 @@ vk::Extent2D SwapChain::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capab
 
         vk::Extent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 
-        actualExtent.width = std::clamp(actualExtent.width,
-                                        capabilities.minImageExtent.width,
-                                        capabilities.maxImageExtent.width);
-        actualExtent.height = std::clamp(actualExtent.height,
-                                         capabilities.minImageExtent.height,
-                                         capabilities.maxImageExtent.height);
+        actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+        actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
         return actualExtent;
     }
 }
@@ -176,16 +160,14 @@ vk::Extent2D SwapChain::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capab
 void SwapChain::createSwapChain()
 {
     engine::utils::SwapChainSupportDetails swapChainSupport =
-        engine::utils::SwapChainSupportDetails::querySwapChainSupport(m_device->GetPhysicalDevice(),
-                                                                      m_device->GetSurface());
+        engine::utils::SwapChainSupportDetails::querySwapChainSupport(m_device->GetPhysicalDevice(), m_device->GetSurface());
 
     vk::SurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.m_formats);
     vk::PresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.m_presentModes);
     vk::Extent2D extent = chooseSwapExtent(swapChainSupport.m_capabilities);
 
     uint32_t imageCount = swapChainSupport.m_capabilities.minImageCount + 1;
-    if(swapChainSupport.m_capabilities.maxImageCount > 0 &&
-       imageCount > swapChainSupport.m_capabilities.maxImageCount)
+    if(swapChainSupport.m_capabilities.maxImageCount > 0 && imageCount > swapChainSupport.m_capabilities.maxImageCount)
     {
         imageCount = swapChainSupport.m_capabilities.maxImageCount;
     }
@@ -199,10 +181,8 @@ void SwapChain::createSwapChain()
                                           .imageUsage = vk::ImageUsageFlagBits::eColorAttachment};
 
     engine::utils::QueueFamilyIndices indices =
-        engine::utils::QueueFamilyIndices::findQueueFamilies(m_device->GetPhysicalDevice(),
-                                                             m_device->GetSurface());
-    uint32_t queueFamilyIndices[] = {indices.m_graphicsFamily.value(),
-                                     indices.m_presentFamily.value()};
+        engine::utils::QueueFamilyIndices::findQueueFamilies(m_device->GetPhysicalDevice(), m_device->GetSurface());
+    uint32_t queueFamilyIndices[] = {indices.m_graphicsFamily.value(), indices.m_presentFamily.value()};
 
     if(indices.m_graphicsFamily != indices.m_presentFamily)
     {
@@ -223,17 +203,14 @@ void SwapChain::createSwapChain()
     createInfo.clipped = vk::True;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    if(m_device->GetDevice().createSwapchainKHR(&createInfo, nullptr, &m_swapChain) !=
-       vk::Result::eSuccess)
+    if(m_device->GetDevice().createSwapchainKHR(&createInfo, nullptr, &m_swapChain) != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to create swap chain!");
     }
 
-    [[maybe_unused]] auto result =
-        m_device->GetDevice().getSwapchainImagesKHR(m_swapChain, &imageCount, nullptr);
+    [[maybe_unused]] auto result = m_device->GetDevice().getSwapchainImagesKHR(m_swapChain, &imageCount, nullptr);
     m_swapChainImages.resize(imageCount);
-    result = m_device->GetDevice().getSwapchainImagesKHR(
-        m_swapChain, &imageCount, m_swapChainImages.data());
+    result = m_device->GetDevice().getSwapchainImagesKHR(m_swapChain, &imageCount, m_swapChainImages.data());
     m_swapChainImageFormat = surfaceFormat.format;
     m_swapChainExtent = extent;
 }
@@ -244,8 +221,7 @@ void SwapChain::createImageViews()
 
     for(size_t i = 0; i < m_swapChainImages.size(); i++)
     {
-        m_swapChainImageViews[i] = createImageView(
-            m_swapChainImages[i], m_swapChainImageFormat, vk::ImageAspectFlagBits::eColor);
+        m_swapChainImageViews[i] = createImageView(m_swapChainImages[i], m_swapChainImageFormat, vk::ImageAspectFlagBits::eColor);
     }
 }
 
@@ -260,8 +236,7 @@ void SwapChain::createRenderPass()
                                               .initialLayout = vk::ImageLayout::eUndefined,
                                               .finalLayout = vk::ImageLayout::ePresentSrcKHR};
 
-    vk::AttachmentReference colorAttachmentRef{.attachment = 0,
-                                               .layout = vk::ImageLayout::eColorAttachmentOptimal};
+    vk::AttachmentReference colorAttachmentRef{.attachment = 0, .layout = vk::ImageLayout::eColorAttachmentOptimal};
 
     vk::AttachmentDescription depthAttachment{.format = findDepthFormat(),
                                               .samples = vk::SampleCountFlagBits::e1,
@@ -270,11 +245,9 @@ void SwapChain::createRenderPass()
                                               .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
                                               .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
                                               .initialLayout = vk::ImageLayout::eUndefined,
-                                              .finalLayout =
-                                                  vk::ImageLayout::eDepthStencilAttachmentOptimal};
+                                              .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal};
 
-    vk::AttachmentReference depthAttachmentRef{
-        .attachment = 1, .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal};
+    vk::AttachmentReference depthAttachmentRef{.attachment = 1, .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal};
 
     vk::SubpassDescription subpass{
         .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
@@ -286,25 +259,20 @@ void SwapChain::createRenderPass()
     vk::SubpassDependency dependency{
         .srcSubpass = vk::SubpassExternal,
         .dstSubpass = 0,
-        .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
-                        vk::PipelineStageFlagBits::eLateFragmentTests,
-        .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
-                        vk::PipelineStageFlagBits::eEarlyFragmentTests,
+        .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eLateFragmentTests,
+        .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
         .srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-        .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite |
-                         vk::AccessFlagBits::eDepthStencilAttachmentWrite};
+        .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite};
 
     std::array<vk::AttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
-    vk::RenderPassCreateInfo renderPassInfo{.attachmentCount =
-                                                static_cast<uint32_t>(attachments.size()),
+    vk::RenderPassCreateInfo renderPassInfo{.attachmentCount = static_cast<uint32_t>(attachments.size()),
                                             .pAttachments = attachments.data(),
                                             .subpassCount = 1,
                                             .pSubpasses = &subpass,
                                             .dependencyCount = 1,
                                             .pDependencies = &dependency};
 
-    if(m_device->GetDevice().createRenderPass(&renderPassInfo, nullptr, &m_renderPass) !=
-       vk::Result::eSuccess)
+    if(m_device->GetDevice().createRenderPass(&renderPassInfo, nullptr, &m_renderPass) != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to create render pass!");
     }
@@ -319,15 +287,13 @@ void SwapChain::createFrameBuffers()
         std::array<vk::ImageView, 2> attachments = {m_swapChainImageViews[i], m_depthImageView};
 
         vk::FramebufferCreateInfo frameBufferInfo{.renderPass = m_renderPass,
-                                                  .attachmentCount =
-                                                      static_cast<uint32_t>(attachments.size()),
+                                                  .attachmentCount = static_cast<uint32_t>(attachments.size()),
                                                   .pAttachments = attachments.data(),
                                                   .width = m_swapChainExtent.width,
                                                   .height = m_swapChainExtent.height,
                                                   .layers = 1};
 
-        if(m_device->GetDevice().createFramebuffer(
-               &frameBufferInfo, nullptr, &m_swapChainFramebuffers[i]) != vk::Result::eSuccess)
+        if(m_device->GetDevice().createFramebuffer(&frameBufferInfo, nullptr, &m_swapChainFramebuffers[i]) != vk::Result::eSuccess)
         {
             throw std::runtime_error("Failed to create framebuffer!");
         }
@@ -349,22 +315,19 @@ void SwapChain::createDepthResources()
     m_depthImageView = createImageView(m_depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
 }
 
-vk::Format SwapChain::findSupportedFormat(const std::vector<vk::Format>& candidates,
-                                          vk::ImageTiling tiling,
-                                          vk::FormatFeatureFlags features)
+vk::Format
+SwapChain::findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features)
 {
     for(vk::Format format : candidates)
     {
         vk::FormatProperties props;
         m_device->GetPhysicalDevice().getFormatProperties(format, &props);
 
-        if(tiling == vk::ImageTiling::eLinear &&
-           (props.linearTilingFeatures & features) == features)
+        if(tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)
         {
             return format;
         }
-        else if(tiling == vk::ImageTiling::eOptimal &&
-                (props.optimalTilingFeatures & features) == features)
+        else if(tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features)
         {
             return format;
         }
@@ -375,10 +338,9 @@ vk::Format SwapChain::findSupportedFormat(const std::vector<vk::Format>& candida
 
 vk::Format SwapChain::findDepthFormat()
 {
-    return findSupportedFormat(
-        {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
-        vk::ImageTiling::eOptimal,
-        vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+    return findSupportedFormat({vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
+                               vk::ImageTiling::eOptimal,
+                               vk::FormatFeatureFlagBits::eDepthStencilAttachment);
 }
 
 void SwapChain::cleanupSwapChain()

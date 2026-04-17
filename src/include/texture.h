@@ -10,6 +10,11 @@
 namespace engine
 {
 
+struct TextureParams
+{
+    std::string m_filepath;
+};
+
 class Texture
 {
 public:
@@ -26,10 +31,12 @@ public:
     //TODO: also make filepath a parameter
     explicit Texture(std::shared_ptr<Device> device,
                      std::shared_ptr<SwapChain> swapChain,
-                     std::shared_ptr<CommandBuffer> commandBuffer)
+                     std::shared_ptr<CommandBuffer> commandBuffer,
+                     const TextureParams& params)
         : m_device(device)
         , m_swapChain(swapChain)
         , m_commandBuffer(commandBuffer)
+        , m_params(params)
     {
         createTextureImage();
         createTextureImageView();
@@ -69,8 +76,7 @@ private:
             .unnormalizedCoordinates = vk::False,
         };
 
-        if(m_device->GetDevice().createSampler(&samplerInfo, nullptr, &m_textureSampler) !=
-           vk::Result::eSuccess)
+        if(m_device->GetDevice().createSampler(&samplerInfo, nullptr, &m_textureSampler) != vk::Result::eSuccess)
         {
             throw std::runtime_error("failed to create texture sampler!");
         }
@@ -78,15 +84,13 @@ private:
 
     void createTextureImageView()
     {
-        m_textureImageView = m_swapChain->createImageView(
-            m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
+        m_textureImageView = m_swapChain->createImageView(m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
     }
 
     void createTextureImage()
     {
         int texWidth, texHeight, texChannels;
-        stbi_uc* pixels =
-            stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        stbi_uc* pixels = stbi_load(m_params.m_filepath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         vk::DeviceSize imageSize = texWidth * texHeight * 4;
 
         if(!pixels)
@@ -98,14 +102,12 @@ private:
         vk::DeviceMemory stagingBufferMemory;
         m_device->createBuffer(imageSize,
                                vk::BufferUsageFlagBits::eTransferSrc,
-                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                   vk::MemoryPropertyFlagBits::eHostCoherent,
+                               vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                                stagingBuffer,
                                stagingBufferMemory);
 
         void* data;
-        [[maybe_unused]] auto ignored =
-            m_device->GetDevice().mapMemory(stagingBufferMemory, 0, imageSize, {}, &data);
+        [[maybe_unused]] auto ignored = m_device->GetDevice().mapMemory(stagingBufferMemory, 0, imageSize, {}, &data);
         memcpy(data, pixels, static_cast<size_t>(imageSize));
         m_device->GetDevice().unmapMemory(stagingBufferMemory);
 
@@ -115,34 +117,23 @@ private:
                                  texHeight,
                                  vk::Format::eR8G8B8A8Srgb,
                                  vk::ImageTiling::eOptimal,
-                                 vk::ImageUsageFlagBits::eTransferDst |
-                                     vk::ImageUsageFlagBits::eSampled,
+                                 vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
                                  vk::MemoryPropertyFlagBits::eDeviceLocal,
                                  m_textureImage,
                                  m_textureImageMemory);
 
-        transitionImageLayout(m_textureImage,
-                              vk::Format::eR8G8B8A8Srgb,
-                              vk::ImageLayout::eUndefined,
-                              vk::ImageLayout::eTransferDstOptimal);
+        transitionImageLayout(
+            m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
 
-        copyBufferToImage(stagingBuffer,
-                          m_textureImage,
-                          static_cast<uint32_t>(texWidth),
-                          static_cast<uint32_t>(texHeight));
-        transitionImageLayout(m_textureImage,
-                              vk::Format::eR8G8B8A8Srgb,
-                              vk::ImageLayout::eTransferDstOptimal,
-                              vk::ImageLayout::eShaderReadOnlyOptimal);
+        copyBufferToImage(stagingBuffer, m_textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+        transitionImageLayout(
+            m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 
         m_device->GetDevice().destroyBuffer(stagingBuffer, nullptr);
         m_device->GetDevice().freeMemory(stagingBufferMemory, nullptr);
     }
 
-    void transitionImageLayout(vk::Image image,
-                               vk::Format format,
-                               vk::ImageLayout oldLayout,
-                               vk::ImageLayout newLayout)
+    void transitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
     {
         vk::CommandBuffer commandBuffer = m_commandBuffer->beginSingleTimeCommands();
 
@@ -165,8 +156,7 @@ private:
         vk::PipelineStageFlags sourceStage;
         vk::PipelineStageFlags destinationStage;
 
-        if(oldLayout == vk::ImageLayout::eUndefined &&
-           newLayout == vk::ImageLayout::eTransferDstOptimal)
+        if(oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eTransferDstOptimal)
         {
             barrier.srcAccessMask = {};
             barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
@@ -174,8 +164,7 @@ private:
             sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
             destinationStage = vk::PipelineStageFlagBits::eTransfer;
         }
-        else if(oldLayout == vk::ImageLayout::eTransferDstOptimal &&
-                newLayout == vk::ImageLayout::eShaderReadOnlyOptimal)
+        else if(oldLayout == vk::ImageLayout::eTransferDstOptimal && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal)
         {
             barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
@@ -188,8 +177,7 @@ private:
             throw std::invalid_argument("unsupported layout transition!");
         }
 
-        commandBuffer.pipelineBarrier(
-            sourceStage, destinationStage, {}, 0, nullptr, 0, nullptr, 1, &barrier);
+        commandBuffer.pipelineBarrier(sourceStage, destinationStage, {}, 0, nullptr, 0, nullptr, 1, &barrier);
 
         m_commandBuffer->endSingleTimeCommands(commandBuffer);
     }
@@ -213,8 +201,7 @@ private:
             .imageExtent = {width, height, 1},
         };
 
-        commandBuffer.copyBufferToImage(
-            buffer, image, vk::ImageLayout::eTransferDstOptimal, 1, &region);
+        commandBuffer.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, 1, &region);
 
         m_commandBuffer->endSingleTimeCommands(commandBuffer);
     }
@@ -222,6 +209,7 @@ private:
     std::shared_ptr<Device> m_device;
     std::shared_ptr<SwapChain> m_swapChain;
     std::shared_ptr<CommandBuffer> m_commandBuffer;
+    const TextureParams& m_params;
 
     vk::Image m_textureImage;
     vk::DeviceMemory m_textureImageMemory;

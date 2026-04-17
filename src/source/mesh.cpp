@@ -28,9 +28,7 @@ VkBuffer Mesh::GetIndexBuffer() const
     return m_indexBuffer;
 }
 
-Mesh::Mesh(std::shared_ptr<Device> device,
-           std::shared_ptr<CommandBuffer> commandBuffer,
-           std::string modelPath)
+Mesh::Mesh(std::shared_ptr<Device> device, std::shared_ptr<CommandBuffer> commandBuffer, std::string modelPath)
     : m_device{device}
     , m_commandBuffer{commandBuffer}
 {
@@ -105,23 +103,20 @@ void Mesh::createVertexBuffer()
     vk::DeviceMemory stagingBufferMemory;
     m_device->createBuffer(bufferSize,
                            vk::BufferUsageFlagBits::eTransferSrc,
-                           vk::MemoryPropertyFlagBits::eHostVisible |
-                               vk::MemoryPropertyFlagBits::eHostCoherent,
+                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                            stagingBuffer,
                            stagingBufferMemory);
 
     void* data;
-    [[maybe_unused]] auto ignored =
-        m_device->GetDevice().mapMemory(stagingBufferMemory, 0, bufferSize, {}, &data);
+    [[maybe_unused]] auto ignored = m_device->GetDevice().mapMemory(stagingBufferMemory, 0, bufferSize, {}, &data);
     memcpy(data, m_vertices.data(), (size_t)bufferSize);
     m_device->GetDevice().unmapMemory(stagingBufferMemory);
 
-    m_device->createBuffer(
-        bufferSize,
-        vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-        m_vertexBuffer,
-        m_vertexBufferMemory);
+    m_device->createBuffer(bufferSize,
+                           vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
+                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                           m_vertexBuffer,
+                           m_vertexBufferMemory);
     copyBuffer(stagingBuffer, m_vertexBuffer, bufferSize);
 
     m_device->GetDevice().destroyBuffer(stagingBuffer, nullptr);
@@ -136,20 +131,17 @@ void Mesh::createIndexBuffer()
     vk::DeviceMemory stagingBufferMemory;
     m_device->createBuffer(bufferSize,
                            vk::BufferUsageFlagBits::eTransferSrc,
-                           vk::MemoryPropertyFlagBits::eHostVisible |
-                               vk::MemoryPropertyFlagBits::eHostCoherent,
+                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                            stagingBuffer,
                            stagingBufferMemory);
 
     void* data;
-    [[maybe_unused]] auto ignored =
-        m_device->GetDevice().mapMemory(stagingBufferMemory, 0, bufferSize, {}, &data);
+    [[maybe_unused]] auto ignored = m_device->GetDevice().mapMemory(stagingBufferMemory, 0, bufferSize, {}, &data);
     memcpy(data, m_indices.data(), (size_t)bufferSize);
     m_device->GetDevice().unmapMemory(stagingBufferMemory);
 
     m_device->createBuffer(bufferSize,
-                           vk::BufferUsageFlagBits::eTransferDst |
-                               vk::BufferUsageFlagBits::eIndexBuffer,
+                           vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer,
                            vk::MemoryPropertyFlagBits::eDeviceLocal,
                            m_indexBuffer,
                            m_indexBufferMemory);

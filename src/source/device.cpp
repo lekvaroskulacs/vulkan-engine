@@ -63,8 +63,7 @@ uint32_t Device::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags pro
 
     for(uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
     {
-        if((typeFilter & (1 << i)) &&
-           (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+        if((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
         {
             return i;
         }
@@ -79,8 +78,7 @@ void Device::createBuffer(vk::DeviceSize size,
                           vk::Buffer& buffer,
                           vk::DeviceMemory& bufferMemory)
 {
-    vk::BufferCreateInfo bufferInfo{
-        .size = size, .usage = usage, .sharingMode = vk::SharingMode::eExclusive};
+    vk::BufferCreateInfo bufferInfo{.size = size, .usage = usage, .sharingMode = vk::SharingMode::eExclusive};
 
     if(m_device.createBuffer(&bufferInfo, nullptr, &buffer) != vk::Result::eSuccess)
     {
@@ -90,9 +88,8 @@ void Device::createBuffer(vk::DeviceSize size,
     vk::MemoryRequirements memRequirements;
     m_device.getBufferMemoryRequirements(buffer, &memRequirements);
 
-    vk::MemoryAllocateInfo allocInfo{
-        .allocationSize = memRequirements.size,
-        .memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties)};
+    vk::MemoryAllocateInfo allocInfo{.allocationSize = memRequirements.size,
+                                     .memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties)};
 
     if(m_device.allocateMemory(&allocInfo, nullptr, &bufferMemory) != vk::Result::eSuccess)
     {
@@ -102,11 +99,10 @@ void Device::createBuffer(vk::DeviceSize size,
     m_device.bindBufferMemory(buffer, bufferMemory, 0);
 }
 
-VKAPI_ATTR vk::Bool32 VKAPI_CALL
-Device::debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                      vk::DebugUtilsMessageTypeFlagsEXT messageType,
-                      const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
-                      void* pUserData)
+VKAPI_ATTR vk::Bool32 VKAPI_CALL Device::debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                                       vk::DebugUtilsMessageTypeFlagsEXT messageType,
+                                                       const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
+                                                       void* pUserData)
 {
     std::string sSeverity{};
     switch(messageSeverity)
@@ -125,8 +121,7 @@ Device::debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
         break;
     }
 
-    std::cerr << "Validation layer\t| " << sSeverity + "\t| " << pCallbackData->pMessage
-              << std::endl;
+    std::cerr << "Validation layer\t| " << sSeverity + "\t| " << pCallbackData->pMessage << std::endl;
 
     return VK_FALSE;
 }
@@ -136,8 +131,7 @@ void Device::populateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoE
     createInfo = {.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
                                      vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
                                      vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
-                  .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                                 vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+                  .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
                                  vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
                   .pfnUserCallback = debugCallback};
 }
@@ -150,8 +144,7 @@ void Device::setupDebugMessenger()
     vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
     populateDebugMessengerCreateInfo(createInfo);
 
-    if(m_instance.createDebugUtilsMessengerEXT(&createInfo, nullptr, &m_debugMessenger) !=
-       vk::Result::eSuccess)
+    if(m_instance.createDebugUtilsMessengerEXT(&createInfo, nullptr, &m_debugMessenger) != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to set up debug messenger!");
     }
@@ -206,12 +199,10 @@ std::vector<const char*> Device::getRequiredExtensions()
 bool Device::checkDeviceExtensionSupport(vk::PhysicalDevice device)
 {
     uint32_t extensionCount;
-    [[maybe_unused]] auto result =
-        device.enumerateDeviceExtensionProperties(nullptr, &extensionCount, nullptr);
+    [[maybe_unused]] auto result = device.enumerateDeviceExtensionProperties(nullptr, &extensionCount, nullptr);
 
     std::vector<vk::ExtensionProperties> availableExtensionProperties(extensionCount);
-    result = device.enumerateDeviceExtensionProperties(
-        nullptr, &extensionCount, availableExtensionProperties.data());
+    result = device.enumerateDeviceExtensionProperties(nullptr, &extensionCount, availableExtensionProperties.data());
 
     std::set<std::string> requiredExtensions{g_deviceExtensions.begin(), g_deviceExtensions.end()};
 
@@ -232,8 +223,7 @@ void Device::createInstance()
 
     uint32_t extensionCount = 0;
     std::vector<vk::ExtensionProperties> extensionList{extensionCount};
-    [[maybe_unused]] auto result =
-        vk::enumerateInstanceExtensionProperties(nullptr, &extensionCount, extensionList.data());
+    [[maybe_unused]] auto result = vk::enumerateInstanceExtensionProperties(nullptr, &extensionCount, extensionList.data());
 
     for(const auto& extension : extensionList)
     {
@@ -300,8 +290,7 @@ int Device::rateDeviceSuitability(vk::PhysicalDevice device)
 
     score += deviceProperties.limits.maxImageDimension2D;
 
-    utils::QueueFamilyIndices indices =
-        utils::QueueFamilyIndices::findQueueFamilies(device, m_surface);
+    utils::QueueFamilyIndices indices = utils::QueueFamilyIndices::findQueueFamilies(device, m_surface);
     if(!indices.isComplete())
     {
         return 0;
@@ -312,8 +301,7 @@ int Device::rateDeviceSuitability(vk::PhysicalDevice device)
         return 0;
     }
 
-    utils::SwapChainSupportDetails swapChainSupport =
-        utils::SwapChainSupportDetails::querySwapChainSupport(device, m_surface);
+    utils::SwapChainSupportDetails swapChainSupport = utils::SwapChainSupportDetails::querySwapChainSupport(device, m_surface);
     if(swapChainSupport.m_formats.empty() || swapChainSupport.m_presentModes.empty())
     {
         return 0;
@@ -367,12 +355,10 @@ void Device::pickPhysicalDevice()
 
 void Device::createLogicalDevice()
 {
-    utils::QueueFamilyIndices indices =
-        utils::QueueFamilyIndices::findQueueFamilies(m_physicalDevice, m_surface);
+    utils::QueueFamilyIndices indices = utils::QueueFamilyIndices::findQueueFamilies(m_physicalDevice, m_surface);
 
     std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies = {indices.m_graphicsFamily.value(),
-                                              indices.m_presentFamily.value()};
+    std::set<uint32_t> uniqueQueueFamilies = {indices.m_graphicsFamily.value(), indices.m_presentFamily.value()};
 
     float queuePriority = 1.0f;
     for(const auto queueFamily : uniqueQueueFamilies)
@@ -384,12 +370,11 @@ void Device::createLogicalDevice()
 
     vk::PhysicalDeviceFeatures deviceFeatures{.samplerAnisotropy = VK_TRUE};
 
-    vk::DeviceCreateInfo createInfo{
-        .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
-        .pQueueCreateInfos = queueCreateInfos.data(),
-        .enabledExtensionCount = static_cast<uint32_t>(g_deviceExtensions.size()),
-        .ppEnabledExtensionNames = g_deviceExtensions.data(),
-        .pEnabledFeatures = &deviceFeatures};
+    vk::DeviceCreateInfo createInfo{.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+                                    .pQueueCreateInfos = queueCreateInfos.data(),
+                                    .enabledExtensionCount = static_cast<uint32_t>(g_deviceExtensions.size()),
+                                    .ppEnabledExtensionNames = g_deviceExtensions.data(),
+                                    .pEnabledFeatures = &deviceFeatures};
 
     if(g_enableValidationLayers)
     {

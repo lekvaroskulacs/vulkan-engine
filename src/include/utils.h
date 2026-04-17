@@ -84,13 +84,11 @@ struct SwapChainSupportDetails
     std::vector<vk::SurfaceFormatKHR> m_formats;
     std::vector<vk::PresentModeKHR> m_presentModes;
 
-    static SwapChainSupportDetails querySwapChainSupport(vk::PhysicalDevice device,
-                                                         vk::SurfaceKHR surface)
+    static SwapChainSupportDetails querySwapChainSupport(vk::PhysicalDevice device, vk::SurfaceKHR surface)
     {
         SwapChainSupportDetails details;
 
-        [[maybe_unused]] auto result =
-            device.getSurfaceCapabilitiesKHR(surface, &details.m_capabilities);
+        [[maybe_unused]] auto result = device.getSurfaceCapabilitiesKHR(surface, &details.m_capabilities);
 
         uint32_t formatCount;
         result = device.getSurfaceFormatsKHR(surface, &formatCount, nullptr);
@@ -105,8 +103,7 @@ struct SwapChainSupportDetails
         if(presentModeCount != 0)
         {
             details.m_presentModes.resize(presentModeCount);
-            result = device.getSurfacePresentModesKHR(
-                surface, &formatCount, details.m_presentModes.data());
+            result = device.getSurfacePresentModesKHR(surface, &formatCount, details.m_presentModes.data());
         }
 
         return details;

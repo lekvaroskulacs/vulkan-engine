@@ -15,16 +15,12 @@ struct UniformBufferObject
     alignas(16) glm::mat4 proj;
 };
 
-class Uniforms
+class Uniform
 {
 public:
-    explicit Uniforms(std::shared_ptr<Device> device)
-        : m_device{device}
-    {
-        createUniformBuffers();
-    }
-
-    ~Uniforms()
+    explicit Uniform(std::shared_ptr<Device> device)
+        : m_device{device} { };
+    ~Uniform()
     {
         for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -33,9 +29,10 @@ public:
         }
     }
 
+    template <typename BufferObject>
     void createUniformBuffers()
     {
-        vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
+        vk::DeviceSize bufferSize = sizeof(BufferObject);
 
         m_uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         m_uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
@@ -45,13 +42,12 @@ public:
         {
             m_device->createBuffer(bufferSize,
                                    vk::BufferUsageFlagBits::eUniformBuffer,
-                                   vk::MemoryPropertyFlagBits::eHostVisible |
-                                       vk::MemoryPropertyFlagBits::eHostCoherent,
+                                   vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                                    m_uniformBuffers[i],
                                    m_uniformBuffersMemory[i]);
 
-            [[maybe_unused]] auto ignored = m_device->GetDevice().mapMemory(
-                m_uniformBuffersMemory[i], 0, bufferSize, {}, &m_uniformBuffersMapped[i]);
+            [[maybe_unused]] auto ignored =
+                m_device->GetDevice().mapMemory(m_uniformBuffersMemory[i], 0, bufferSize, {}, &m_uniformBuffersMapped[i]);
         }
     }
 

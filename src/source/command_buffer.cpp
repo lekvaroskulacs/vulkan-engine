@@ -35,8 +35,7 @@ vk::CommandBuffer CommandBuffer::beginSingleTimeCommands()
     };
 
     vk::CommandBuffer commandBuffer;
-    [[maybe_unused]] auto result =
-        m_device->GetDevice().allocateCommandBuffers(&allocInfo, &commandBuffer);
+    [[maybe_unused]] auto result = m_device->GetDevice().allocateCommandBuffers(&allocInfo, &commandBuffer);
 
     vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
 
@@ -51,8 +50,7 @@ void CommandBuffer::endSingleTimeCommands(vk::CommandBuffer commandBuffer)
 
     vk::SubmitInfo submitInfo{.commandBufferCount = 1, .pCommandBuffers = &commandBuffer};
 
-    [[maybe_unused]] auto result =
-        m_device->GetGraphicsQueue().submit(1, &submitInfo, VK_NULL_HANDLE);
+    [[maybe_unused]] auto result = m_device->GetGraphicsQueue().submit(1, &submitInfo, VK_NULL_HANDLE);
     m_device->GetGraphicsQueue().waitIdle();
 
     m_device->GetDevice().freeCommandBuffers(m_commandPool, 1, &commandBuffer);
@@ -61,15 +59,12 @@ void CommandBuffer::endSingleTimeCommands(vk::CommandBuffer commandBuffer)
 void CommandBuffer::createCommandPool()
 {
     engine::utils::QueueFamilyIndices queueFamilyIndices =
-        engine::utils::QueueFamilyIndices::findQueueFamilies(m_device->GetPhysicalDevice(),
-                                                             m_device->GetSurface());
+        engine::utils::QueueFamilyIndices::findQueueFamilies(m_device->GetPhysicalDevice(), m_device->GetSurface());
 
     vk::CommandPoolCreateInfo poolInfo{.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-                                       .queueFamilyIndex =
-                                           queueFamilyIndices.m_graphicsFamily.value()};
+                                       .queueFamilyIndex = queueFamilyIndices.m_graphicsFamily.value()};
 
-    if(m_device->GetDevice().createCommandPool(&poolInfo, nullptr, &m_commandPool) !=
-       vk::Result::eSuccess)
+    if(m_device->GetDevice().createCommandPool(&poolInfo, nullptr, &m_commandPool) != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to create command pool!");
     }
@@ -85,8 +80,7 @@ void CommandBuffer::createCommandBuffers()
         .commandBufferCount = static_cast<uint32_t>(m_commandBuffers.size()),
     };
 
-    if(m_device->GetDevice().allocateCommandBuffers(&allocInfo, m_commandBuffers.data()) !=
-       vk::Result::eSuccess)
+    if(m_device->GetDevice().allocateCommandBuffers(&allocInfo, m_commandBuffers.data()) != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to allocate command buffers!");
     }

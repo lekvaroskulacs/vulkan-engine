@@ -9,7 +9,7 @@ namespace engine
 
 struct DrawFrameParams
 {
-    Uniforms& m_uniforms;
+    Uniform& m_uniforms;
     DescriptorSets& m_descriptorSets;
     Pipeline& m_pipeline;
     Mesh& m_mesh;
@@ -32,7 +32,7 @@ public:
                              const DescriptorSets& descriptorSets);
 
     void drawFrame(DrawFrameParams& params);
-    void updateUniformBuffer(uint32_t currentImage, Uniforms& uniforms);
+    void updateUniformBuffer(uint32_t currentImage, Uniform& uniforms);
 
 private:
     void createSyncObjects();
