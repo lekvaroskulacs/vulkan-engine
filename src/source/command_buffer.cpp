@@ -13,9 +13,8 @@ std::vector<vk::CommandBuffer> CommandBuffer::GetBuffers()
     return m_commandBuffers;
 }
 
-CommandBuffer::CommandBuffer(std::shared_ptr<Device> device, std::shared_ptr<SwapChain> swapChain)
+CommandBuffer::CommandBuffer(std::shared_ptr<Device> device)
     : m_device(device)
-    , m_swapChain(swapChain)
 {
     createCommandPool();
     createCommandBuffers();

@@ -21,9 +21,10 @@ public:
     VkBuffer GetIndexBuffer() const;
 
     explicit Mesh(std::shared_ptr<Device> device, std::shared_ptr<CommandBuffer> commandBuffer, std::string modelPath);
+    explicit Mesh();
     ~Mesh();
 
-private:
+protected:
     void loadModel(std::string modelPath);
     void copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
     void createVertexBuffer();

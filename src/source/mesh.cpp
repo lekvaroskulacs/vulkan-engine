@@ -37,6 +37,8 @@ Mesh::Mesh(std::shared_ptr<Device> device, std::shared_ptr<CommandBuffer> comman
     createIndexBuffer();
 }
 
+Mesh::Mesh() { }
+
 Mesh::~Mesh()
 {
     m_device->GetDevice().destroyBuffer(m_indexBuffer, nullptr);

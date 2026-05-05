@@ -4,16 +4,25 @@
 #include <vulkan/vulkan.hpp>
 
 #include "command_buffer.h"
+#include "image_utils.h"
 
 #include <stb_image.h>
+#include <variant>
 
 namespace engine
 {
 
-struct TextureParams
+struct Texture2DParams
 {
     std::string m_filepath;
 };
+
+struct TextureCubeParams
+{
+    std::array<std::string, 6> m_filepaths;
+};
+
+using TextureParams = std::variant<Texture2DParams, TextureCubeParams>;
 
 class Texture
 {
@@ -28,19 +37,23 @@ public:
         return m_textureSampler;
     }
 
-    //TODO: also make filepath a parameter
-    explicit Texture(std::shared_ptr<Device> device,
-                     std::shared_ptr<SwapChain> swapChain,
-                     std::shared_ptr<CommandBuffer> commandBuffer,
-                     const TextureParams& params)
+    explicit Texture(std::shared_ptr<Device> device, std::shared_ptr<CommandBuffer> commandBuffer, const TextureParams& params)
         : m_device(device)
-        , m_swapChain(swapChain)
         , m_commandBuffer(commandBuffer)
         , m_params(params)
     {
-        createTextureImage();
-        createTextureImageView();
-        createTextureSampler();
+        if(std::holds_alternative<Texture2DParams>(params))
+        {
+            createTextureImage();
+            createTextureImageView();
+            createTextureSampler();
+        }
+        else if(std::holds_alternative<TextureCubeParams>(params))
+        {
+            createTextureCubeImage();
+            createTextureCubeImageView();
+            createTextureSampler();
+        }
     }
 
     ~Texture()
@@ -84,13 +97,15 @@ private:
 
     void createTextureImageView()
     {
-        m_textureImageView = m_swapChain->createImageView(m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
+        m_textureImageView =
+            utils::createImageView(m_device->GetDevice(), m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
     }
 
     void createTextureImage()
     {
+        auto* params = std::get_if<Texture2DParams>(&m_params);
         int texWidth, texHeight, texChannels;
-        stbi_uc* pixels = stbi_load(m_params.m_filepath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        stbi_uc* pixels = stbi_load(params->m_filepath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         vk::DeviceSize imageSize = texWidth * texHeight * 4;
 
         if(!pixels)
@@ -113,14 +128,15 @@ private:
 
         stbi_image_free(pixels);
 
-        m_swapChain->createImage(texWidth,
-                                 texHeight,
-                                 vk::Format::eR8G8B8A8Srgb,
-                                 vk::ImageTiling::eOptimal,
-                                 vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-                                 vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                 m_textureImage,
-                                 m_textureImageMemory);
+        utils::createImage(*m_device,
+                           texWidth,
+                           texHeight,
+                           vk::Format::eR8G8B8A8Srgb,
+                           vk::ImageTiling::eOptimal,
+                           vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                           vk::MemoryPropertyFlagBits::eDeviceLocal,
+                           m_textureImage,
+                           m_textureImageMemory);
 
         transitionImageLayout(
             m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
@@ -133,7 +149,8 @@ private:
         m_device->GetDevice().freeMemory(stagingBufferMemory, nullptr);
     }
 
-    void transitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
+    void transitionImageLayout(
+        vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, uint32_t barrierLayerCount = 1)
     {
         vk::CommandBuffer commandBuffer = m_commandBuffer->beginSingleTimeCommands();
 
@@ -142,7 +159,7 @@ private:
             .baseMipLevel = 0,
             .levelCount = 1,
             .baseArrayLayer = 0,
-            .layerCount = 1,
+            .layerCount = barrierLayerCount,
         };
         vk::ImageMemoryBarrier barrier{
             .oldLayout = oldLayout,
@@ -182,7 +199,7 @@ private:
         m_commandBuffer->endSingleTimeCommands(commandBuffer);
     }
 
-    void copyBufferToImage(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height)
+    void copyBufferToImage(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height, uint32_t layerCount = 1)
     {
         vk::CommandBuffer commandBuffer = m_commandBuffer->beginSingleTimeCommands();
 
@@ -190,7 +207,7 @@ private:
             .aspectMask = vk::ImageAspectFlagBits::eColor,
             .mipLevel = 0,
             .baseArrayLayer = 0,
-            .layerCount = 1,
+            .layerCount = layerCount,
         };
         vk::BufferImageCopy region{
             .bufferOffset = 0,
@@ -206,8 +223,121 @@ private:
         m_commandBuffer->endSingleTimeCommands(commandBuffer);
     }
 
+    void createTextureCubeImage()
+    {
+        auto* params = std::get_if<TextureCubeParams>(&m_params);
+
+        std::vector<stbi_uc*> pixels;
+        pixels.resize(6);
+        int texWidth, texHeight, texChannels;
+        for(int i = 0; i < 6; ++i)
+        {
+            pixels[i] = stbi_load(params->m_filepaths[i].c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        }
+        vk::DeviceSize layerSize = texWidth * texHeight * 4;
+        vk::DeviceSize imageSize = layerSize * 6;
+
+        bool anyFailed = false;
+        for(int i = 0; i < 6; ++i)
+        {
+            if(!pixels[i])
+            {
+                anyFailed = true;
+                break;
+            }
+        }
+        if(anyFailed)
+        {
+            throw std::runtime_error("Failed to load texture image!");
+        }
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        m_device->createBuffer(imageSize,
+                               vk::BufferUsageFlagBits::eTransferSrc,
+                               vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                               stagingBuffer,
+                               stagingBufferMemory);
+
+        void* data;
+        [[maybe_unused]] auto ignored = m_device->GetDevice().mapMemory(stagingBufferMemory, 0, imageSize, {}, &data);
+
+        for(int i = 0; i < 6; ++i)
+        {
+            memcpy(static_cast<char*>(data) + (i * layerSize), pixels[i], static_cast<size_t>(layerSize));
+        }
+        m_device->GetDevice().unmapMemory(stagingBufferMemory);
+
+        for(auto element : pixels)
+        {
+            stbi_image_free(element);
+        }
+
+        utils::createImage(*m_device,
+                           texWidth,
+                           texHeight,
+                           vk::Format::eR8G8B8A8Srgb,
+                           vk::ImageTiling::eOptimal,
+                           vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                           vk::MemoryPropertyFlagBits::eDeviceLocal,
+                           m_textureImage,
+                           m_textureImageMemory,
+                           {vk::ImageCreateFlagBits::eCubeCompatible},
+                           6);
+
+        transitionImageLayout(
+            m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, 6);
+
+        copyBufferToImage(stagingBuffer, m_textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 6);
+        transitionImageLayout(m_textureImage,
+                              vk::Format::eR8G8B8A8Srgb,
+                              vk::ImageLayout::eTransferDstOptimal,
+                              vk::ImageLayout::eShaderReadOnlyOptimal,
+                              6);
+
+        m_device->GetDevice().destroyBuffer(stagingBuffer, nullptr);
+        m_device->GetDevice().freeMemory(stagingBufferMemory, nullptr);
+    }
+
+    void createTextureCubeImageView()
+    {
+        m_textureImageView = utils::createImageView(m_device->GetDevice(),
+                                                    m_textureImage,
+                                                    vk::Format::eR8G8B8A8Srgb,
+                                                    vk::ImageAspectFlagBits::eColor,
+                                                    6,
+                                                    vk::ImageViewType::eCube);
+    }
+
+    void copyBufferToImageCube(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height, uint32_t layerCount = 1)
+    {
+        vk::CommandBuffer commandBuffer = m_commandBuffer->beginSingleTimeCommands();
+
+        std::vector<vk::BufferImageCopy> regions(6);
+        for(uint32_t i = 0; i < 6; ++i)
+        {
+            vk::ImageSubresourceLayers subresource{
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .mipLevel = 0,
+                .baseArrayLayer = i,
+                .layerCount = 1,
+            };
+            vk::BufferImageCopy region{
+                .bufferOffset = 0,
+                .bufferRowLength = 0,
+                .bufferImageHeight = 0,
+                .imageSubresource = subresource,
+                .imageOffset = {0, 0, 0},
+                .imageExtent = {width, height, 1},
+            };
+        }
+        commandBuffer.copyBufferToImage(
+            buffer, image, vk::ImageLayout::eTransferDstOptimal, static_cast<uint32_t>(regions.size()), regions.data());
+
+        m_commandBuffer->endSingleTimeCommands(commandBuffer);
+    }
+
     std::shared_ptr<Device> m_device;
-    std::shared_ptr<SwapChain> m_swapChain;
     std::shared_ptr<CommandBuffer> m_commandBuffer;
     const TextureParams& m_params;
 

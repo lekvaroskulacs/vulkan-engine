@@ -22,12 +22,13 @@ VkPipelineLayout Pipeline::GetLayout() const
 Pipeline::Pipeline(std::shared_ptr<Device> device,
                    std::shared_ptr<SwapChain> swapChain,
                    const std::vector<std::shared_ptr<Uniform>>& uniforms,
-                   const std::vector<std::shared_ptr<Texture>>& textures)
+                   const std::vector<std::shared_ptr<Texture>>& textures,
+                   const CreatePipelineParams& params)
     : m_device(device)
     , m_swapChain(swapChain)
 {
     createDescriptorSetLayout(uniforms, textures);
-    createGraphicsPipeline();
+    createGraphicsPipeline(params);
 }
 
 Pipeline::~Pipeline()
@@ -37,6 +38,7 @@ Pipeline::~Pipeline()
     m_device->GetDevice().destroyPipelineLayout(m_pipelineLayout, nullptr);
 }
 
+// TODO: maybe provide uniforms and textures in <int, Uniform> map, corresponding to binding
 void Pipeline::createDescriptorSetLayout(const std::vector<std::shared_ptr<Uniform>>& uniforms,
                                          const std::vector<std::shared_ptr<Texture>>& textures)
 {
@@ -82,10 +84,10 @@ vk::ShaderModule Pipeline::createShaderModule(const std::vector<char>& code)
     return shaderModule;
 }
 
-void Pipeline::createGraphicsPipeline()
+void Pipeline::createGraphicsPipeline(const CreatePipelineParams& params)
 {
-    auto vertShaderCode = engine::utils::readFile("shaders/bin/vert.spv");
-    auto fragShaderCode = engine::utils::readFile("shaders/bin/frag.spv");
+    auto vertShaderCode = engine::utils::readFile(params.m_vertexShaderPath);
+    auto fragShaderCode = engine::utils::readFile(params.m_fragmentShaderPath);
 
     vk::ShaderModule vertShaderModule = createShaderModule(vertShaderCode);
     vk::ShaderModule fragShaderModule = createShaderModule(fragShaderCode);

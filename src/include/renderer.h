@@ -1,5 +1,6 @@
 #pragma once
 
+#include "camera.h"
 #include "command_buffer.h"
 #include "descriptor_sets.h"
 #include "mesh.h"
@@ -7,6 +8,7 @@
 namespace engine
 {
 
+/// Data per draw call
 struct DrawFrameParams
 {
     Uniform& m_uniforms;
@@ -20,18 +22,15 @@ class Renderer
 public:
     explicit Renderer(std::shared_ptr<Device> device,
                       std::shared_ptr<SwapChain> swapChain,
-                      std::shared_ptr<CommandBuffer> commandBuffers);
+                      std::shared_ptr<CommandBuffer> commandBuffers,
+                      std::shared_ptr<Camera> camera);
     ~Renderer();
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 
-    void recordCommandBuffer(vk::CommandBuffer commandBuffer,
-                             uint32_t imageIndex,
-                             const Pipeline& pipeline,
-                             const Mesh& mesh,
-                             const DescriptorSets& descriptorSets);
+    void recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex, const std::vector<DrawFrameParams>& params_list);
 
-    void drawFrame(DrawFrameParams& params);
+    void drawFrame(const std::vector<DrawFrameParams>& params_list);
     void updateUniformBuffer(uint32_t currentImage, Uniform& uniforms);
 
 private:
@@ -40,6 +39,7 @@ private:
     std::shared_ptr<Device> m_device;
     std::shared_ptr<SwapChain> m_swapChain;
     std::shared_ptr<CommandBuffer> m_commandBuffers;
+    std::shared_ptr<Camera> m_camera;
 
     std::vector<vk::Semaphore> m_imageAvailableSemaphores;
     std::vector<vk::Semaphore> m_renderFinishedSemaphores;

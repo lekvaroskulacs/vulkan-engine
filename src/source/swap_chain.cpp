@@ -1,4 +1,5 @@
 #include "../include/swap_chain.h"
+#include "../include/image_utils.h"
 #include <algorithm>
 #include <array>
 #include <limits>
@@ -43,57 +44,6 @@ std::vector<vk::Framebuffer> SwapChain::GetFrameBuffers()
 std::vector<vk::Image> SwapChain::GetImages()
 {
     return m_swapChainImages;
-}
-
-void SwapChain::createImage(uint32_t width,
-                            uint32_t height,
-                            vk::Format format,
-                            vk::ImageTiling tiling,
-                            vk::ImageUsageFlags usage,
-                            vk::MemoryPropertyFlags properties,
-                            vk::Image& image,
-                            vk::DeviceMemory& imageMemory)
-{
-    vk::Extent3D extent{.width = width, .height = height, .depth = 1};
-    vk::ImageCreateInfo imageInfo{
-        .imageType = vk::ImageType::e2D,
-        .format = format,
-        .extent = extent,
-        .mipLevels = 1,
-        .arrayLayers = 1,
-        .samples = vk::SampleCountFlagBits::e1,
-        .tiling = tiling,
-        .usage = usage,
-        .sharingMode = vk::SharingMode::eExclusive,
-        .initialLayout = vk::ImageLayout::eUndefined,
-    };
-    if(m_device->GetDevice().createImage(&imageInfo, nullptr, &image) != vk::Result::eSuccess)
-    {
-        throw std::runtime_error("failed to create image!");
-    }
-    vk::MemoryRequirements memRequirements;
-    m_device->GetDevice().getImageMemoryRequirements(image, &memRequirements);
-    vk::MemoryAllocateInfo allocInfo{.allocationSize = memRequirements.size,
-                                     .memoryTypeIndex = m_device->findMemoryType(memRequirements.memoryTypeBits, properties)};
-    if(m_device->GetDevice().allocateMemory(&allocInfo, nullptr, &imageMemory) != vk::Result::eSuccess)
-    {
-        throw std::runtime_error("failed to allocate image memory!");
-    }
-    m_device->GetDevice().bindImageMemory(image, imageMemory, 0);
-}
-
-vk::ImageView SwapChain::createImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags)
-{
-    vk::ImageSubresourceRange subresourceRange{
-        .aspectMask = aspectFlags, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
-    vk::ImageViewCreateInfo viewInfo{
-        .image = image, .viewType = vk::ImageViewType::e2D, .format = format, .subresourceRange = subresourceRange};
-    vk::ImageView imageView;
-    if(m_device->GetDevice().createImageView(&viewInfo, nullptr, &imageView) != vk::Result::eSuccess)
-    {
-        throw std::runtime_error("failed to create image view!");
-    }
-    return imageView;
 }
 
 void SwapChain::recreateSwapChain()
@@ -221,7 +171,8 @@ void SwapChain::createImageViews()
 
     for(size_t i = 0; i < m_swapChainImages.size(); i++)
     {
-        m_swapChainImageViews[i] = createImageView(m_swapChainImages[i], m_swapChainImageFormat, vk::ImageAspectFlagBits::eColor);
+        m_swapChainImageViews[i] = utils::createImageView(
+            m_device->GetDevice(), m_swapChainImages[i], m_swapChainImageFormat, vk::ImageAspectFlagBits::eColor);
     }
 }
 
@@ -304,15 +255,16 @@ void SwapChain::createDepthResources()
 {
     vk::Format depthFormat = findDepthFormat();
 
-    createImage(m_swapChainExtent.width,
-                m_swapChainExtent.height,
-                depthFormat,
-                vk::ImageTiling::eOptimal,
-                vk::ImageUsageFlagBits::eDepthStencilAttachment,
-                vk::MemoryPropertyFlagBits::eDeviceLocal,
-                m_depthImage,
-                m_depthImageMemory);
-    m_depthImageView = createImageView(m_depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
+    utils::createImage(*m_device,
+                       m_swapChainExtent.width,
+                       m_swapChainExtent.height,
+                       depthFormat,
+                       vk::ImageTiling::eOptimal,
+                       vk::ImageUsageFlagBits::eDepthStencilAttachment,
+                       vk::MemoryPropertyFlagBits::eDeviceLocal,
+                       m_depthImage,
+                       m_depthImageMemory);
+    m_depthImageView = utils::createImageView(m_device->GetDevice(), m_depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
 }
 
 vk::Format

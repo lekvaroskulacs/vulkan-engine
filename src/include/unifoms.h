@@ -13,6 +13,7 @@ struct UniformBufferObject
     alignas(16) glm::mat4 model;
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
+    alignas(16) glm::mat4 rayDir;
 };
 
 class Uniform
@@ -30,7 +31,7 @@ public:
     }
 
     template <typename BufferObject>
-    void createUniformBuffers()
+    void setBufferObject()
     {
         vk::DeviceSize bufferSize = sizeof(BufferObject);
 

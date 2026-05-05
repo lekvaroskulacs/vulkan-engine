@@ -13,6 +13,12 @@
 namespace engine
 {
 
+struct CreatePipelineParams
+{
+    std::string m_vertexShaderPath;
+    std::string m_fragmentShaderPath;
+};
+
 class Pipeline
 {
 public:
@@ -23,14 +29,15 @@ public:
     explicit Pipeline(std::shared_ptr<Device> device,
                       std::shared_ptr<SwapChain> swapChain,
                       const std::vector<std::shared_ptr<Uniform>>& uniforms,
-                      const std::vector<std::shared_ptr<Texture>>& textures);
+                      const std::vector<std::shared_ptr<Texture>>& textures,
+                      const CreatePipelineParams& params);
     ~Pipeline();
 
 private:
     void createDescriptorSetLayout(const std::vector<std::shared_ptr<Uniform>>& uniforms,
                                    const std::vector<std::shared_ptr<Texture>>& textures);
     vk::ShaderModule createShaderModule(const std::vector<char>& code);
-    void createGraphicsPipeline();
+    void createGraphicsPipeline(const CreatePipelineParams& params);
 
     std::shared_ptr<Device> m_device;
     std::shared_ptr<SwapChain> m_swapChain;

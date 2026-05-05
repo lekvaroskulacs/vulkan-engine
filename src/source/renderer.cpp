@@ -6,10 +6,14 @@
 namespace engine
 {
 
-Renderer::Renderer(std::shared_ptr<Device> device, std::shared_ptr<SwapChain> swapChain, std::shared_ptr<CommandBuffer> commandBuffers)
+Renderer::Renderer(std::shared_ptr<Device> device,
+                   std::shared_ptr<SwapChain> swapChain,
+                   std::shared_ptr<CommandBuffer> commandBuffers,
+                   std::shared_ptr<Camera> camera)
     : m_device{device}
     , m_swapChain{swapChain}
     , m_commandBuffers{commandBuffers}
+    , m_camera{camera}
 {
     createSyncObjects();
 }
@@ -35,9 +39,7 @@ void Renderer::framebufferResizeCallback(GLFWwindow* window, int width, int heig
 
 void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer,
                                    uint32_t imageIndex,
-                                   const Pipeline& pipeline,
-                                   const Mesh& mesh,
-                                   const DescriptorSets& descriptorSets)
+                                   const std::vector<DrawFrameParams>& params_list)
 {
     vk::CommandBufferBeginInfo beginInfo{
         .flags = {},
@@ -62,33 +64,45 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer,
         .pClearValues = clearValues.data(),
     };
     commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
-    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.Get());
-    vk::Viewport viewport{
-        .x = 0.0f,
-        .y = 0.0f,
-        .width = static_cast<float>(m_swapChain->GetExtent().width),
-        .height = static_cast<float>(m_swapChain->GetExtent().height),
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
-    };
-    commandBuffer.setViewport(0, 1, &viewport);
-    vk::Rect2D scissor{
-        .offset = {0, 0},
-        .extent = m_swapChain->GetExtent(),
-    };
-    commandBuffer.setScissor(0, 1, &scissor);
-    vk::Buffer vertexBuffers[] = {mesh.GetVertexBuffer()};
-    vk::DeviceSize offsets[] = {0};
-    commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
-    commandBuffer.bindIndexBuffer(mesh.GetIndexBuffer(), 0, vk::IndexType::eUint32);
-    commandBuffer.bindDescriptorSets(
-        vk::PipelineBindPoint::eGraphics, pipeline.GetLayout(), 0, 1, &descriptorSets.m_descriptorSets[m_currentFrame], 0, nullptr);
-    commandBuffer.drawIndexed(static_cast<uint32_t>(mesh.GetIndices().size()), 1, 0, 0, 0);
+
+    for(auto& params : params_list)
+    {
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, params.m_pipeline.Get());
+        vk::Viewport viewport{
+            .x = 0.0f,
+            .y = 0.0f,
+            .width = static_cast<float>(m_swapChain->GetExtent().width),
+            .height = static_cast<float>(m_swapChain->GetExtent().height),
+            .minDepth = 0.0f,
+            .maxDepth = 1.0f,
+        };
+        commandBuffer.setViewport(0, 1, &viewport);
+        vk::Rect2D scissor{
+            .offset = {0, 0},
+            .extent = m_swapChain->GetExtent(),
+        };
+        commandBuffer.setScissor(0, 1, &scissor);
+
+        vk::Buffer vertexBuffers[] = {params.m_mesh.GetVertexBuffer()};
+        vk::DeviceSize offsets[] = {0};
+
+        commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+        commandBuffer.bindIndexBuffer(params.m_mesh.GetIndexBuffer(), 0, vk::IndexType::eUint32);
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                         params.m_pipeline.GetLayout(),
+                                         0,
+                                         1,
+                                         &params.m_descriptorSets.m_descriptorSets[m_currentFrame],
+                                         0,
+                                         nullptr);
+        commandBuffer.drawIndexed(static_cast<uint32_t>(params.m_mesh.GetIndices().size()), 1, 0, 0, 0);
+    }
+
     commandBuffer.endRenderPass();
     commandBuffer.end();
 }
 
-void Renderer::drawFrame(DrawFrameParams& params)
+void Renderer::drawFrame(const std::vector<DrawFrameParams>& params_list)
 {
     [[maybe_unused]] auto ignored = m_device->GetDevice().waitForFences(1, &m_inFlightFences[m_currentFrame], vk::True, UINT64_MAX);
     uint32_t imageIndex;
@@ -105,9 +119,10 @@ void Renderer::drawFrame(DrawFrameParams& params)
     }
     ignored = m_device->GetDevice().resetFences(1, &m_inFlightFences[m_currentFrame]);
     m_commandBuffers->GetBuffers()[m_currentFrame].reset();
-    recordCommandBuffer(
-        m_commandBuffers->GetBuffers()[m_currentFrame], imageIndex, params.m_pipeline, params.m_mesh, params.m_descriptorSets);
-    updateUniformBuffer(m_currentFrame, params.m_uniforms);
+
+    recordCommandBuffer(m_commandBuffers->GetBuffers()[m_currentFrame], imageIndex, params_list);
+    updateUniformBuffer(m_currentFrame, params_list[0].m_uniforms);
+
     vk::Semaphore waitSemaphores[] = {m_imageAvailableSemaphores[m_currentFrame]};
     vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
     vk::Semaphore signalSemaphores[] = {m_renderFinishedSemaphores[imageIndex]};
@@ -152,10 +167,15 @@ void Renderer::updateUniformBuffer(uint32_t currentImage, Uniform& uniforms)
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
     engine::UniformBufferObject ubo{};
     ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(m_camera->m_cameraPos, m_camera->m_cameraPos + m_camera->m_cameraFront, m_camera->m_cameraUp);
     ubo.proj =
-        glm::perspective(glm::radians(45.0f), m_swapChain->GetExtent().width / (float)m_swapChain->GetExtent().height, 0.1f, 10.0f);
+        glm::perspective(glm::radians(45.0f), m_swapChain->GetExtent().width / (float)m_swapChain->GetExtent().height, 0.1f, 1000.0f);
     ubo.proj[1][1] *= -1;
+
+    glm::mat4 rayDir{1.0};
+    rayDir = glm::translate(rayDir, m_camera->m_cameraPos);
+    rayDir = glm::inverse(ubo.proj * ubo.view * rayDir);
+    ubo.rayDir = rayDir;
     memcpy(uniforms.m_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }
 
