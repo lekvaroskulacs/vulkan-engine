@@ -34,9 +34,9 @@ protected:
     std::shared_ptr<engine::CommandBuffer> m_commandBuffer;
 
     vk::Buffer m_vertexBuffer;
-    vk::DeviceMemory m_vertexBufferMemory;
+    VmaAllocation m_vertexBufferAllocation;
     vk::Buffer m_indexBuffer;
-    vk::DeviceMemory m_indexBufferMemory;
+    VmaAllocation m_indexBufferAllocation;
 
     std::vector<Vertex> m_vertices;
     std::vector<uint32_t> m_indices;

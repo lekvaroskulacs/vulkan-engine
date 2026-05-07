@@ -4,6 +4,7 @@
 #include "command_buffer.h"
 #include "descriptor_sets.h"
 #include "mesh.h"
+#include "user_interface.h"
 
 namespace engine
 {
@@ -23,7 +24,8 @@ public:
     explicit Renderer(std::shared_ptr<Device> device,
                       std::shared_ptr<SwapChain> swapChain,
                       std::shared_ptr<CommandBuffer> commandBuffers,
-                      std::shared_ptr<Camera> camera);
+                      std::shared_ptr<Camera> camera,
+                      std::shared_ptr<UserInterface> ui);
     ~Renderer();
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
@@ -40,6 +42,7 @@ private:
     std::shared_ptr<SwapChain> m_swapChain;
     std::shared_ptr<CommandBuffer> m_commandBuffers;
     std::shared_ptr<Camera> m_camera;
+    std::shared_ptr<UserInterface> m_ui;
 
     std::vector<vk::Semaphore> m_imageAvailableSemaphores;
     std::vector<vk::Semaphore> m_renderFinishedSemaphores;

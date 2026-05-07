@@ -4,7 +4,6 @@
 #include <vulkan/vulkan.hpp>
 
 #include "command_buffer.h"
-#include "image_utils.h"
 
 #include <stb_image.h>
 #include <variant>
@@ -61,8 +60,7 @@ public:
         m_device->GetDevice().destroySampler(m_textureSampler, nullptr);
         m_device->GetDevice().destroyImageView(m_textureImageView, nullptr);
 
-        m_device->GetDevice().destroyImage(m_textureImage, nullptr);
-        m_device->GetDevice().freeMemory(m_textureImageMemory, nullptr);
+        m_device->destroyImage(m_textureImage, m_textureImageAllocation);
     }
 
 private:
@@ -97,8 +95,7 @@ private:
 
     void createTextureImageView()
     {
-        m_textureImageView =
-            utils::createImageView(m_device->GetDevice(), m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
+        m_textureImageView = m_device->createImageView(m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
     }
 
     void createTextureImage()
@@ -114,29 +111,25 @@ private:
         }
 
         vk::Buffer stagingBuffer;
-        vk::DeviceMemory stagingBufferMemory;
+        VmaAllocation stagingBufferAllocation;
         m_device->createBuffer(imageSize,
                                vk::BufferUsageFlagBits::eTransferSrc,
                                vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                                stagingBuffer,
-                               stagingBufferMemory);
+                               stagingBufferAllocation);
 
-        void* data;
-        [[maybe_unused]] auto ignored = m_device->GetDevice().mapMemory(stagingBufferMemory, 0, imageSize, {}, &data);
-        memcpy(data, pixels, static_cast<size_t>(imageSize));
-        m_device->GetDevice().unmapMemory(stagingBufferMemory);
+        m_device->copyMemoryToAllocation(pixels, stagingBufferAllocation, imageSize);
 
         stbi_image_free(pixels);
 
-        utils::createImage(*m_device,
-                           texWidth,
-                           texHeight,
-                           vk::Format::eR8G8B8A8Srgb,
-                           vk::ImageTiling::eOptimal,
-                           vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-                           vk::MemoryPropertyFlagBits::eDeviceLocal,
-                           m_textureImage,
-                           m_textureImageMemory);
+        m_device->createImage(texWidth,
+                              texHeight,
+                              vk::Format::eR8G8B8A8Srgb,
+                              vk::ImageTiling::eOptimal,
+                              vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                              vk::MemoryPropertyFlagBits::eDeviceLocal,
+                              m_textureImage,
+                              m_textureImageAllocation);
 
         transitionImageLayout(
             m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
@@ -145,8 +138,7 @@ private:
         transitionImageLayout(
             m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 
-        m_device->GetDevice().destroyBuffer(stagingBuffer, nullptr);
-        m_device->GetDevice().freeMemory(stagingBufferMemory, nullptr);
+        m_device->destroyBuffer(stagingBuffer, stagingBufferAllocation);
     }
 
     void transitionImageLayout(
@@ -252,38 +244,33 @@ private:
         }
 
         vk::Buffer stagingBuffer;
-        vk::DeviceMemory stagingBufferMemory;
+        VmaAllocation stagingBufferAllocation;
         m_device->createBuffer(imageSize,
                                vk::BufferUsageFlagBits::eTransferSrc,
                                vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                                stagingBuffer,
-                               stagingBufferMemory);
-
-        void* data;
-        [[maybe_unused]] auto ignored = m_device->GetDevice().mapMemory(stagingBufferMemory, 0, imageSize, {}, &data);
+                               stagingBufferAllocation);
 
         for(int i = 0; i < 6; ++i)
         {
-            memcpy(static_cast<char*>(data) + (i * layerSize), pixels[i], static_cast<size_t>(layerSize));
+            m_device->copyMemoryToAllocation(pixels[i], stagingBufferAllocation, layerSize, i * layerSize);
         }
-        m_device->GetDevice().unmapMemory(stagingBufferMemory);
 
         for(auto element : pixels)
         {
             stbi_image_free(element);
         }
 
-        utils::createImage(*m_device,
-                           texWidth,
-                           texHeight,
-                           vk::Format::eR8G8B8A8Srgb,
-                           vk::ImageTiling::eOptimal,
-                           vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-                           vk::MemoryPropertyFlagBits::eDeviceLocal,
-                           m_textureImage,
-                           m_textureImageMemory,
-                           {vk::ImageCreateFlagBits::eCubeCompatible},
-                           6);
+        m_device->createImage(texWidth,
+                              texHeight,
+                              vk::Format::eR8G8B8A8Srgb,
+                              vk::ImageTiling::eOptimal,
+                              vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                              vk::MemoryPropertyFlagBits::eDeviceLocal,
+                              m_textureImage,
+                              m_textureImageAllocation,
+                              {vk::ImageCreateFlagBits::eCubeCompatible},
+                              6);
 
         transitionImageLayout(
             m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, 6);
@@ -295,18 +282,13 @@ private:
                               vk::ImageLayout::eShaderReadOnlyOptimal,
                               6);
 
-        m_device->GetDevice().destroyBuffer(stagingBuffer, nullptr);
-        m_device->GetDevice().freeMemory(stagingBufferMemory, nullptr);
+        m_device->destroyBuffer(stagingBuffer, stagingBufferAllocation);
     }
 
     void createTextureCubeImageView()
     {
-        m_textureImageView = utils::createImageView(m_device->GetDevice(),
-                                                    m_textureImage,
-                                                    vk::Format::eR8G8B8A8Srgb,
-                                                    vk::ImageAspectFlagBits::eColor,
-                                                    6,
-                                                    vk::ImageViewType::eCube);
+        m_textureImageView = m_device->createImageView(
+            m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor, 6, vk::ImageViewType::eCube);
     }
 
     void copyBufferToImageCube(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height, uint32_t layerCount = 1)
@@ -342,7 +324,7 @@ private:
     const TextureParams& m_params;
 
     vk::Image m_textureImage;
-    vk::DeviceMemory m_textureImageMemory;
+    VmaAllocation m_textureImageAllocation;
     vk::ImageView m_textureImageView;
     vk::Sampler m_textureSampler;
 };

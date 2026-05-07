@@ -1,4 +1,7 @@
 #include "../include/device.h"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
 
 namespace engine
 {
@@ -42,10 +45,12 @@ Device::Device(std::shared_ptr<Window> window)
     createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
+    createMemoryAllocator();
 }
 
 Device::~Device()
 {
+    vmaDestroyAllocator(m_allocator);
     m_device.destroy(nullptr);
     if(g_enableValidationLayers)
     {
@@ -72,31 +77,90 @@ uint32_t Device::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags pro
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
-void Device::createBuffer(vk::DeviceSize size,
-                          vk::BufferUsageFlags usage,
-                          vk::MemoryPropertyFlags properties,
-                          vk::Buffer& buffer,
-                          vk::DeviceMemory& bufferMemory)
+void Device::createBuffer(
+    vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer& buffer, VmaAllocation& allocation)
 {
     vk::BufferCreateInfo bufferInfo{.size = size, .usage = usage, .sharingMode = vk::SharingMode::eExclusive};
 
-    if(m_device.createBuffer(&bufferInfo, nullptr, &buffer) != vk::Result::eSuccess)
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocInfo.requiredFlags = static_cast<VkMemoryPropertyFlags>(properties);
+
+    if((properties & vk::MemoryPropertyFlagBits::eHostCoherent) != vk::MemoryPropertyFlags{})
     {
-        throw std::runtime_error("failed to create buffer!");
+        allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
     }
 
-    vk::MemoryRequirements memRequirements;
-    m_device.getBufferMemoryRequirements(buffer, &memRequirements);
+    // Little bit hacky because of vulkan.hpp types
+    VkBufferCreateInfo info = bufferInfo;
+    VkBuffer temp_buffer;
+    vmaCreateBuffer(m_allocator, &info, &allocInfo, &temp_buffer, &allocation, nullptr);
+    buffer = std::move(temp_buffer);
+}
 
-    vk::MemoryAllocateInfo allocInfo{.allocationSize = memRequirements.size,
-                                     .memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties)};
+void Device::copyMemoryToAllocation(void* data, VmaAllocation& allocation, vk::DeviceSize size, vk::DeviceSize offset)
+{
+    vmaCopyMemoryToAllocation(m_allocator, data, allocation, offset, size);
+}
 
-    if(m_device.allocateMemory(&allocInfo, nullptr, &bufferMemory) != vk::Result::eSuccess)
+void Device::destroyBuffer(vk::Buffer& buffer, VmaAllocation& allocation)
+{
+    vmaDestroyBuffer(m_allocator, buffer, allocation);
+}
+
+vk::ImageView Device::createImageView(
+    vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags, uint32_t layerCount, vk::ImageViewType viewType)
+{
+    vk::ImageSubresourceRange subresourceRange{
+        .aspectMask = aspectFlags, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = layerCount};
+    vk::ImageViewCreateInfo viewInfo{.image = image, .viewType = viewType, .format = format, .subresourceRange = subresourceRange};
+    vk::ImageView imageView;
+    if(m_device.createImageView(&viewInfo, nullptr, &imageView) != vk::Result::eSuccess)
     {
-        throw std::runtime_error("failed to allocate buffer memory!");
+        throw std::runtime_error("failed to create image view!");
     }
+    return imageView;
+}
 
-    m_device.bindBufferMemory(buffer, bufferMemory, 0);
+void Device::createImage(uint32_t width,
+                         uint32_t height,
+                         vk::Format format,
+                         vk::ImageTiling tiling,
+                         vk::ImageUsageFlags usage,
+                         vk::MemoryPropertyFlags properties,
+                         vk::Image& image,
+                         VmaAllocation& allocation,
+                         vk::ImageCreateFlags flags,
+                         uint32_t arrayLayers)
+{
+    vk::Extent3D extent{.width = width, .height = height, .depth = 1};
+    vk::ImageCreateInfo imageInfo{
+        .flags = flags,
+        .imageType = vk::ImageType::e2D,
+        .format = format,
+        .extent = extent,
+        .mipLevels = 1,
+        .arrayLayers = arrayLayers,
+        .samples = vk::SampleCountFlagBits::e1,
+        .tiling = tiling,
+        .usage = usage,
+        .sharingMode = vk::SharingMode::eExclusive,
+        .initialLayout = vk::ImageLayout::eUndefined,
+    };
+
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocInfo.requiredFlags = static_cast<VkMemoryPropertyFlags>(properties);
+
+    VkImageCreateInfo vkImageInfo = imageInfo;
+    VkImage temp_image;
+    vmaCreateImage(m_allocator, &vkImageInfo, &allocInfo, &temp_image, &allocation, nullptr);
+    image = std::move(temp_image);
+}
+
+void Device::destroyImage(vk::Image& image, VmaAllocation& allocation)
+{
+    vmaDestroyImage(m_allocator, image, allocation);
 }
 
 VKAPI_ATTR vk::Bool32 VKAPI_CALL Device::debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -234,7 +298,7 @@ void Device::createInstance()
                                 .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
                                 .pEngineName = "No Engine",
                                 .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-                                .apiVersion = vk::ApiVersion10};
+                                .apiVersion = vk::ApiVersion12};
 
     auto extensions = getRequiredExtensions();
 
@@ -395,6 +459,47 @@ void Device::createLogicalDevice()
 
     m_device.getQueue(indices.m_graphicsFamily.value(), 0, &m_graphicsQueue);
     m_device.getQueue(indices.m_presentFamily.value(), 0, &m_presentQueue);
+}
+
+void Device::createMemoryAllocator()
+{
+    VmaAllocatorCreateInfo allocCreateInfo{};
+    allocCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+    allocCreateInfo.vulkanApiVersion = VK_API_VERSION_1_2;
+    allocCreateInfo.physicalDevice = m_physicalDevice;
+    allocCreateInfo.device = m_device;
+    allocCreateInfo.instance = m_instance;
+
+    vmaCreateAllocator(&allocCreateInfo, &m_allocator);
+}
+
+void Device::initImGui(VkDescriptorPool descriptorPool, vk::RenderPass renderpass)
+{
+    ImGui_ImplGlfw_InitForVulkan(m_window->Get(), true);
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.ApiVersion = VK_API_VERSION_1_2;
+    init_info.Instance = m_instance;
+    init_info.PhysicalDevice = m_physicalDevice;
+    init_info.Device = m_device;
+    auto queueFamily = ImGui_ImplVulkanH_SelectQueueFamilyIndex(m_physicalDevice);
+    init_info.QueueFamily = queueFamily;
+    vkGetDeviceQueue(m_device, queueFamily, 0, &init_info.Queue);
+    init_info.PipelineCache = VK_NULL_HANDLE;
+    init_info.DescriptorPool = descriptorPool;
+    init_info.MinImageCount = MAX_FRAMES_IN_FLIGHT;
+    init_info.ImageCount = MAX_FRAMES_IN_FLIGHT;
+    init_info.Allocator = nullptr;
+    init_info.PipelineInfoMain.RenderPass = renderpass;
+    init_info.PipelineInfoMain.Subpass = 0;
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    init_info.CheckVkResultFn = [](VkResult err) {
+        if(err == VK_SUCCESS)
+            return;
+        fprintf(stderr, "[vulkan] Error: VkResult = %d\n", err);
+        if(err < 0)
+            abort();
+    };
+    ImGui_ImplVulkan_Init(&init_info);
 }
 
 } // namespace engine

@@ -1,5 +1,4 @@
 #include "../include/swap_chain.h"
-#include "../include/image_utils.h"
 #include <algorithm>
 #include <array>
 #include <limits>
@@ -171,8 +170,8 @@ void SwapChain::createImageViews()
 
     for(size_t i = 0; i < m_swapChainImages.size(); i++)
     {
-        m_swapChainImageViews[i] = utils::createImageView(
-            m_device->GetDevice(), m_swapChainImages[i], m_swapChainImageFormat, vk::ImageAspectFlagBits::eColor);
+        m_swapChainImageViews[i] =
+            m_device->createImageView(m_swapChainImages[i], m_swapChainImageFormat, vk::ImageAspectFlagBits::eColor);
     }
 }
 
@@ -255,16 +254,15 @@ void SwapChain::createDepthResources()
 {
     vk::Format depthFormat = findDepthFormat();
 
-    utils::createImage(*m_device,
-                       m_swapChainExtent.width,
-                       m_swapChainExtent.height,
-                       depthFormat,
-                       vk::ImageTiling::eOptimal,
-                       vk::ImageUsageFlagBits::eDepthStencilAttachment,
-                       vk::MemoryPropertyFlagBits::eDeviceLocal,
-                       m_depthImage,
-                       m_depthImageMemory);
-    m_depthImageView = utils::createImageView(m_device->GetDevice(), m_depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
+    m_device->createImage(m_swapChainExtent.width,
+                          m_swapChainExtent.height,
+                          depthFormat,
+                          vk::ImageTiling::eOptimal,
+                          vk::ImageUsageFlagBits::eDepthStencilAttachment,
+                          vk::MemoryPropertyFlagBits::eDeviceLocal,
+                          m_depthImage,
+                          m_depthImageAllocation);
+    m_depthImageView = m_device->createImageView(m_depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
 }
 
 vk::Format
@@ -298,8 +296,7 @@ vk::Format SwapChain::findDepthFormat()
 void SwapChain::cleanupSwapChain()
 {
     m_device->GetDevice().destroyImageView(m_depthImageView, nullptr);
-    m_device->GetDevice().destroyImage(m_depthImage, nullptr);
-    m_device->GetDevice().freeMemory(m_depthImageMemory, nullptr);
+    m_device->destroyImage(m_depthImage, m_depthImageAllocation);
 
     for(auto framebuffer : m_swapChainFramebuffers)
     {

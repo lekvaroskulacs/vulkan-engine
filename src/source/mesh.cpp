@@ -41,10 +41,8 @@ Mesh::Mesh() { }
 
 Mesh::~Mesh()
 {
-    m_device->GetDevice().destroyBuffer(m_indexBuffer, nullptr);
-    m_device->GetDevice().freeMemory(m_indexBufferMemory, nullptr);
-    m_device->GetDevice().freeMemory(m_vertexBufferMemory, nullptr);
-    m_device->GetDevice().destroyBuffer(m_vertexBuffer, nullptr);
+    m_device->destroyBuffer(m_indexBuffer, m_indexBufferAllocation);
+    m_device->destroyBuffer(m_vertexBuffer, m_vertexBufferAllocation);
 }
 
 void Mesh::loadModel(std::string modelPath)
@@ -102,27 +100,23 @@ void Mesh::createVertexBuffer()
     vk::DeviceSize bufferSize = sizeof(m_vertices[0]) * m_vertices.size();
 
     vk::Buffer stagingBuffer;
-    vk::DeviceMemory stagingBufferMemory;
+    VmaAllocation stagingBufferAllocation;
     m_device->createBuffer(bufferSize,
                            vk::BufferUsageFlagBits::eTransferSrc,
                            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                            stagingBuffer,
-                           stagingBufferMemory);
+                           stagingBufferAllocation);
 
-    void* data;
-    [[maybe_unused]] auto ignored = m_device->GetDevice().mapMemory(stagingBufferMemory, 0, bufferSize, {}, &data);
-    memcpy(data, m_vertices.data(), (size_t)bufferSize);
-    m_device->GetDevice().unmapMemory(stagingBufferMemory);
+    m_device->copyMemoryToAllocation(m_vertices.data(), stagingBufferAllocation, (size_t)bufferSize);
 
     m_device->createBuffer(bufferSize,
                            vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
                            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                            m_vertexBuffer,
-                           m_vertexBufferMemory);
+                           m_vertexBufferAllocation);
     copyBuffer(stagingBuffer, m_vertexBuffer, bufferSize);
 
-    m_device->GetDevice().destroyBuffer(stagingBuffer, nullptr);
-    m_device->GetDevice().freeMemory(stagingBufferMemory, nullptr);
+    m_device->destroyBuffer(stagingBuffer, stagingBufferAllocation);
 }
 
 void Mesh::createIndexBuffer()
@@ -130,28 +124,24 @@ void Mesh::createIndexBuffer()
     vk::DeviceSize bufferSize = sizeof(m_indices[0]) * m_indices.size();
 
     vk::Buffer stagingBuffer;
-    vk::DeviceMemory stagingBufferMemory;
+    VmaAllocation stagingBufferAllocation;
     m_device->createBuffer(bufferSize,
                            vk::BufferUsageFlagBits::eTransferSrc,
                            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                            stagingBuffer,
-                           stagingBufferMemory);
+                           stagingBufferAllocation);
 
-    void* data;
-    [[maybe_unused]] auto ignored = m_device->GetDevice().mapMemory(stagingBufferMemory, 0, bufferSize, {}, &data);
-    memcpy(data, m_indices.data(), (size_t)bufferSize);
-    m_device->GetDevice().unmapMemory(stagingBufferMemory);
+    m_device->copyMemoryToAllocation(m_indices.data(), stagingBufferAllocation, (size_t)bufferSize);
 
     m_device->createBuffer(bufferSize,
                            vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer,
                            vk::MemoryPropertyFlagBits::eDeviceLocal,
                            m_indexBuffer,
-                           m_indexBufferMemory);
+                           m_indexBufferAllocation);
 
     copyBuffer(stagingBuffer, m_indexBuffer, bufferSize);
 
-    m_device->GetDevice().destroyBuffer(stagingBuffer, nullptr);
-    m_device->GetDevice().freeMemory(stagingBufferMemory, nullptr);
+    m_device->destroyBuffer(stagingBuffer, stagingBufferAllocation);
 }
 
 } // namespace engine

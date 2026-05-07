@@ -25,8 +25,7 @@ public:
     {
         for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            m_device->GetDevice().destroyBuffer(m_uniformBuffers[i], nullptr);
-            m_device->GetDevice().freeMemory(m_uniformBuffersMemory[i], nullptr);
+            m_device->destroyBuffer(m_uniformBuffers[i], m_uniformBuffersAllocations[i]);
         }
     }
 
@@ -36,8 +35,7 @@ public:
         vk::DeviceSize bufferSize = sizeof(BufferObject);
 
         m_uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-        m_uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-        m_uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+        m_uniformBuffersAllocations.resize(MAX_FRAMES_IN_FLIGHT);
 
         for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -45,16 +43,12 @@ public:
                                    vk::BufferUsageFlagBits::eUniformBuffer,
                                    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                                    m_uniformBuffers[i],
-                                   m_uniformBuffersMemory[i]);
-
-            [[maybe_unused]] auto ignored =
-                m_device->GetDevice().mapMemory(m_uniformBuffersMemory[i], 0, bufferSize, {}, &m_uniformBuffersMapped[i]);
+                                   m_uniformBuffersAllocations[i]);
         }
     }
 
     std::vector<vk::Buffer> m_uniformBuffers;
-    std::vector<vk::DeviceMemory> m_uniformBuffersMemory;
-    std::vector<void*> m_uniformBuffersMapped;
+    std::vector<VmaAllocation> m_uniformBuffersAllocations;
 
 private:
     std::shared_ptr<Device> m_device;

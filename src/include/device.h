@@ -28,6 +28,7 @@
 #include <vector>
 
 #include "utils.h"
+#include "vk_mem_alloc.h"
 #include "window.h"
 
 namespace engine
@@ -52,12 +53,34 @@ public:
     explicit Device(std::shared_ptr<Window> window);
     ~Device();
 
+    void initImGui(VkDescriptorPool descriptorPool, vk::RenderPass renderpass);
+
     uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
     void createBuffer(vk::DeviceSize size,
                       vk::BufferUsageFlags usage,
                       vk::MemoryPropertyFlags properties,
                       vk::Buffer& buffer,
-                      vk::DeviceMemory& bufferMemory);
+                      VmaAllocation& allocation);
+
+    void copyMemoryToAllocation(void* data, VmaAllocation& allocation, vk::DeviceSize size, vk::DeviceSize offset = 0);
+    void destroyBuffer(vk::Buffer& buffer, VmaAllocation& allocation);
+
+    vk::ImageView createImageView(vk::Image image,
+                                  vk::Format format,
+                                  vk::ImageAspectFlags aspectFlags,
+                                  uint32_t layerCount = 1,
+                                  vk::ImageViewType viewType = vk::ImageViewType::e2D);
+    void createImage(uint32_t width,
+                     uint32_t height,
+                     vk::Format format,
+                     vk::ImageTiling tiling,
+                     vk::ImageUsageFlags usage,
+                     vk::MemoryPropertyFlags properties,
+                     vk::Image& image,
+                     VmaAllocation& allocation,
+                     vk::ImageCreateFlags flags = {},
+                     uint32_t arrayLayers = 1);
+    void destroyImage(vk::Image& image, VmaAllocation& allocation);
 
 private:
     static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -75,6 +98,7 @@ private:
     int rateDeviceSuitability(vk::PhysicalDevice device);
     void pickPhysicalDevice();
     void createLogicalDevice();
+    void createMemoryAllocator();
 
     std::shared_ptr<Window> m_window;
     vk::Instance m_instance;
@@ -84,6 +108,9 @@ private:
     vk::Queue m_graphicsQueue;
     vk::Queue m_presentQueue;
     vk::SurfaceKHR m_surface;
+
+public:
+    VmaAllocator m_allocator;
 };
 
 } // namespace engine

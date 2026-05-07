@@ -7,6 +7,13 @@
 
 namespace engine
 {
+
+enum class RenderPassStage
+{
+    GeneralObjects,
+    ShadowMap
+};
+
 class SwapChain
 {
 public:
@@ -45,7 +52,7 @@ private:
     std::vector<vk::Framebuffer> m_swapChainFramebuffers;
 
     vk::Image m_depthImage;
-    vk::DeviceMemory m_depthImageMemory;
+    VmaAllocation m_depthImageAllocation;
     vk::ImageView m_depthImageView;
 
     vk::RenderPass m_renderPass;

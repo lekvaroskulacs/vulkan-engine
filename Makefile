@@ -2,18 +2,21 @@ CFLAGS = -std=c++20
 LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
 THIRDPARTY_INCLUDE_PATH = ./thirdparty/
 DEFINES = -DVULKAN_HPP_NO_CONSTRUCTORS -DVULKAN_HPP_NO_STRUCT_CONSTRUCTORS -DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC
+INCLUDES = -I./thirdparty -I./thirdparty/imgui -I./thirdparty/imgui/backends
+IMGUI = ./thirdparty/imgui/*.cpp ./thirdparty/imgui/*.h ./thirdparty/imgui/backends/imgui_impl_vulkan.cpp ./thirdparty/imgui/backends/imgui_impl_vulkan.h ./thirdparty/imgui/backends/imgui_impl_glfw.cpp ./thirdparty/imgui/backends/imgui_impl_glfw.h
+
 
 build: src/main.cpp
 	./compile_shaders.sh
 	./src/clang_format.sh
 	mkdir -p build
-	g++ $(CFLAGS) -o build/engine ./src/source/*.cpp ./src/*.cpp $(LDFLAGS) -I./src/include/ -I$(THIRDPARTY_INCLUDE_PATH) $(DEFINES)
+	g++ $(CFLAGS) -o build/engine ./src/source/*.cpp ./src/*.cpp $(IMGUI) $(LDFLAGS) -I./src/include/ $(INCLUDES) $(DEFINES)
 
 dbg: src/main.cpp
 	./compile_shaders.sh
 	./src/clang_format.sh
 	mkdir -p build
-	g++ $(CFLAGS) -ggdb -o build/engine ./src/source/*.cpp ./src/*.cpp $(LDFLAGS) -I./src/include/ -I$(THIRDPARTY_INCLUDE_PATH) $(DEFINES)
+	g++ $(CFLAGS) -ggdb -o build/engine ./src/source/*.cpp ./src/*.cpp $(IMGUI) $(LDFLAGS) -I./src/include/ $(INCLUDES) $(DEFINES)
 
 
 .PHONY: run clean

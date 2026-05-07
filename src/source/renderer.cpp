@@ -1,4 +1,8 @@
 #include "../include/renderer.h"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
+
 #include <chrono>
 #include <cstring>
 #include <stdexcept>
@@ -9,11 +13,13 @@ namespace engine
 Renderer::Renderer(std::shared_ptr<Device> device,
                    std::shared_ptr<SwapChain> swapChain,
                    std::shared_ptr<CommandBuffer> commandBuffers,
-                   std::shared_ptr<Camera> camera)
+                   std::shared_ptr<Camera> camera,
+                   std::shared_ptr<UserInterface> ui)
     : m_device{device}
     , m_swapChain{swapChain}
     , m_commandBuffers{commandBuffers}
     , m_camera{camera}
+    , m_ui{ui}
 {
     createSyncObjects();
 }
@@ -98,6 +104,8 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer,
         commandBuffer.drawIndexed(static_cast<uint32_t>(params.m_mesh.GetIndices().size()), 1, 0, 0, 0);
     }
 
+    m_ui->renderInterface(commandBuffer);
+
     commandBuffer.endRenderPass();
     commandBuffer.end();
 }
@@ -176,7 +184,8 @@ void Renderer::updateUniformBuffer(uint32_t currentImage, Uniform& uniforms)
     rayDir = glm::translate(rayDir, m_camera->m_cameraPos);
     rayDir = glm::inverse(ubo.proj * ubo.view * rayDir);
     ubo.rayDir = rayDir;
-    memcpy(uniforms.m_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+    // memcpy(uniforms.m_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+    m_device->copyMemoryToAllocation(&ubo, uniforms.m_uniformBuffersAllocations[currentImage], sizeof(ubo));
 }
 
 void Renderer::createSyncObjects()

@@ -27,6 +27,7 @@
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #define STB_IMAGE_IMPLEMENTATION
 #define TINYOBJLOADER_IMPLEMENTATION
+#define VMA_IMPLEMENTATION
 
 #include "fullscreen_quad.h"
 #include "include/camera.h"
@@ -39,6 +40,11 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include "include/swap_chain.h"
 #include "include/texture.h"
 #include "include/unifoms.h"
+#include "include/user_interface.h"
+
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
 
 class EngineApplication
 {
@@ -50,6 +56,7 @@ public:
         m_device = std::make_shared<engine::Device>(m_window);
         m_swapChain = std::make_shared<engine::SwapChain>(m_device, m_window);
         m_commandBuffer = std::make_shared<engine::CommandBuffer>(m_device);
+        m_ui = std::make_shared<engine::UserInterface>(m_device, m_swapChain->GetRenderPass());
 
         engine::Texture2DParams params{.m_filepath = "textures/viking_room.png"};
         m_texture = std::make_shared<engine::Texture>(m_device, m_commandBuffer, params);
@@ -92,7 +99,7 @@ public:
         m_descriptor_sets = std::make_shared<engine::DescriptorSets>(m_device, m_pipeline, uniform_list, texture_list);
         m_env_descriptors = std::make_shared<engine::DescriptorSets>(m_device, m_pipeline, uniform_list, texture_list_env);
         m_skull_descriptors = std::make_shared<engine::DescriptorSets>(m_device, m_pipeline, uniform_list, texture_list_skull);
-        m_renderer = std::make_shared<engine::Renderer>(m_device, m_swapChain, m_commandBuffer, m_camera);
+        m_renderer = std::make_shared<engine::Renderer>(m_device, m_swapChain, m_commandBuffer, m_camera, m_ui);
         m_window->SetResizeCallback(engine::Renderer::framebufferResizeCallback);
 
         mainLoop();
@@ -105,6 +112,7 @@ private:
     std::shared_ptr<engine::CommandBuffer> m_commandBuffer;
     std::shared_ptr<engine::Uniform> m_uniforms;
     std::shared_ptr<engine::Renderer> m_renderer;
+    std::shared_ptr<engine::UserInterface> m_ui;
 
     std::shared_ptr<engine::Pipeline> m_pipeline;
     std::shared_ptr<engine::DescriptorSets> m_descriptor_sets;
@@ -137,6 +145,9 @@ private:
 
             glfwPollEvents();
             m_camera->processInput(m_window->Get(), time);
+
+            m_ui->buildInterface();
+
             std::vector<engine::DrawFrameParams> params_list;
             engine::DrawFrameParams params{.m_uniforms = *m_uniforms,
                                            .m_descriptorSets = *m_descriptor_sets,
