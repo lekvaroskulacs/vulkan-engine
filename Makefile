@@ -1,5 +1,5 @@
 CFLAGS = -std=c++20
-LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
+LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi -lshaderc_shared
 THIRDPARTY_INCLUDE_PATH = ./thirdparty/
 DEFINES = -DVULKAN_HPP_NO_CONSTRUCTORS -DVULKAN_HPP_NO_STRUCT_CONSTRUCTORS -DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC
 INCLUDES = -I./thirdparty -I./thirdparty/imgui -I./thirdparty/imgui/backends

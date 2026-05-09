@@ -32,7 +32,6 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include "fullscreen_quad.h"
 #include "include/camera.h"
 #include "include/command_buffer.h"
-#include "include/descriptor_sets.h"
 #include "include/device.h"
 #include "include/mesh.h"
 #include "include/pipeline.h"
@@ -84,21 +83,18 @@ public:
 
         std::vector<std::shared_ptr<engine::Uniform>> uniform_list = {m_uniforms};
         std::vector<std::shared_ptr<engine::Texture>> texture_list = {m_texture};
-        engine::CreatePipelineParams pipelineParams{.m_vertexShaderPath = "shaders/bin/vert.spv",
-                                                    .m_fragmentShaderPath = "shaders/bin/frag.spv"};
-        m_pipeline = std::make_shared<engine::Pipeline>(m_device, m_swapChain, uniform_list, texture_list, pipelineParams);
+        engine::CreatePipelineParams pipelineParams{.m_vertexShaderPath = "shaders/triangle.vert",
+                                                    .m_fragmentShaderPath = "shaders/triangle.frag"};
+        m_pipeline = std::make_unique<engine::Pipeline>(m_device, m_swapChain, uniform_list, texture_list, pipelineParams);
 
         std::vector<std::shared_ptr<engine::Texture>> texture_list_skull = {m_skull_tex};
-        m_skull_pipeline = std::make_shared<engine::Pipeline>(m_device, m_swapChain, uniform_list, texture_list_skull, pipelineParams);
+        m_skull_pipeline = std::make_unique<engine::Pipeline>(m_device, m_swapChain, uniform_list, texture_list_skull, pipelineParams);
 
         std::vector<std::shared_ptr<engine::Texture>> texture_list_env = {m_envTex};
-        pipelineParams.m_vertexShaderPath = "shaders/bin/env_v.spv";
-        pipelineParams.m_fragmentShaderPath = "shaders/bin/env_f.spv";
-        m_env_pipeline = std::make_shared<engine::Pipeline>(m_device, m_swapChain, uniform_list, texture_list_env, pipelineParams);
+        pipelineParams.m_vertexShaderPath = "shaders/env.vert";
+        pipelineParams.m_fragmentShaderPath = "shaders/env.frag";
+        m_env_pipeline = std::make_unique<engine::Pipeline>(m_device, m_swapChain, uniform_list, texture_list_env, pipelineParams);
 
-        m_descriptor_sets = std::make_shared<engine::DescriptorSets>(m_device, m_pipeline, uniform_list, texture_list);
-        m_env_descriptors = std::make_shared<engine::DescriptorSets>(m_device, m_pipeline, uniform_list, texture_list_env);
-        m_skull_descriptors = std::make_shared<engine::DescriptorSets>(m_device, m_pipeline, uniform_list, texture_list_skull);
         m_renderer = std::make_shared<engine::Renderer>(m_device, m_swapChain, m_commandBuffer, m_camera, m_ui);
         m_window->SetResizeCallback(engine::Renderer::framebufferResizeCallback);
 
@@ -114,18 +110,15 @@ private:
     std::shared_ptr<engine::Renderer> m_renderer;
     std::shared_ptr<engine::UserInterface> m_ui;
 
-    std::shared_ptr<engine::Pipeline> m_pipeline;
-    std::shared_ptr<engine::DescriptorSets> m_descriptor_sets;
+    std::unique_ptr<engine::Pipeline> m_pipeline;
     std::shared_ptr<engine::Texture> m_texture;
     std::unique_ptr<engine::Mesh> m_viking_room;
 
-    std::shared_ptr<engine::Pipeline> m_skull_pipeline;
-    std::shared_ptr<engine::DescriptorSets> m_skull_descriptors;
+    std::unique_ptr<engine::Pipeline> m_skull_pipeline;
     std::shared_ptr<engine::Texture> m_skull_tex;
     std::unique_ptr<engine::Mesh> m_skull;
 
-    std::shared_ptr<engine::Pipeline> m_env_pipeline;
-    std::shared_ptr<engine::DescriptorSets> m_env_descriptors;
+    std::unique_ptr<engine::Pipeline> m_env_pipeline;
     std::shared_ptr<engine::Texture> m_envTex;
     std::unique_ptr<engine::Mesh> m_cube;
     std::unique_ptr<engine::Mesh> m_fullscreen_quad;
@@ -146,21 +139,14 @@ private:
             glfwPollEvents();
             m_camera->processInput(m_window->Get(), time);
 
-            m_ui->buildInterface();
+            engine::UserInterfaceObjectReferences refs{};
+            refs.m_pipelines = {*m_pipeline, *m_env_pipeline, *m_skull_pipeline};
+            m_ui->buildInterface(refs);
 
             std::vector<engine::DrawFrameParams> params_list;
-            engine::DrawFrameParams params{.m_uniforms = *m_uniforms,
-                                           .m_descriptorSets = *m_descriptor_sets,
-                                           .m_pipeline = *m_pipeline,
-                                           .m_mesh = *m_viking_room};
-            engine::DrawFrameParams sky{.m_uniforms = *m_uniforms,
-                                        .m_descriptorSets = *m_env_descriptors,
-                                        .m_pipeline = *m_env_pipeline,
-                                        .m_mesh = *m_fullscreen_quad};
-            engine::DrawFrameParams skull{.m_uniforms = *m_uniforms,
-                                          .m_descriptorSets = *m_skull_descriptors,
-                                          .m_pipeline = *m_skull_pipeline,
-                                          .m_mesh = *m_skull};
+            engine::DrawFrameParams params{.m_uniforms = *m_uniforms, .m_pipeline = *m_pipeline, .m_mesh = *m_viking_room};
+            engine::DrawFrameParams sky{.m_uniforms = *m_uniforms, .m_pipeline = *m_env_pipeline, .m_mesh = *m_fullscreen_quad};
+            engine::DrawFrameParams skull{.m_uniforms = *m_uniforms, .m_pipeline = *m_skull_pipeline, .m_mesh = *m_skull};
             params_list.push_back(params);
             params_list.push_back(sky);
             params_list.push_back(skull);

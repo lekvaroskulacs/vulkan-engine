@@ -2,8 +2,8 @@
 
 #include "camera.h"
 #include "command_buffer.h"
-#include "descriptor_sets.h"
 #include "mesh.h"
+#include "pipeline.h"
 #include "user_interface.h"
 
 namespace engine
@@ -13,7 +13,6 @@ namespace engine
 struct DrawFrameParams
 {
     Uniform& m_uniforms;
-    DescriptorSets& m_descriptorSets;
     Pipeline& m_pipeline;
     Mesh& m_mesh;
 };

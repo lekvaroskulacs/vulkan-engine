@@ -98,7 +98,7 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer,
                                          params.m_pipeline.GetLayout(),
                                          0,
                                          1,
-                                         &params.m_descriptorSets.m_descriptorSets[m_currentFrame],
+                                         &params.m_pipeline.GetDescriptorSets()[m_currentFrame],
                                          0,
                                          nullptr);
         commandBuffer.drawIndexed(static_cast<uint32_t>(params.m_mesh.GetIndices().size()), 1, 0, 0, 0);

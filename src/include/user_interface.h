@@ -4,11 +4,17 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+#include "pipeline.h"
 
 #include <vulkan/vulkan.hpp>
 
 namespace engine
 {
+
+struct UserInterfaceObjectReferences
+{
+    std::vector<std::reference_wrapper<Pipeline>> m_pipelines;
+};
 
 class UserInterface
 {
@@ -54,7 +60,7 @@ public:
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
     }
 
-    void buildInterface()
+    void buildInterface(const UserInterfaceObjectReferences& refs)
     {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -65,16 +71,15 @@ public:
             static float f = 0.0f;
             static int counter = 0;
 
-            ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
+            ImGui::Begin("Controls");
 
-            ImGui::Text("This is some useful text."); // Display some text (you can use a format strings too)
-
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f); // Edit 1 float using a slider from 0.0f to 1.0f
-
-            if(ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
+            if(ImGui::Button("Reload Shaders"))
+            {
+                for(engine::Pipeline& pipeline : refs.m_pipelines)
+                {
+                    pipeline.recreatePipeline();
+                }
+            }
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
