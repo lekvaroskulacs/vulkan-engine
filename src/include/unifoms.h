@@ -8,20 +8,10 @@
 namespace engine
 {
 
-struct UniformBufferObject
-{
-    alignas(16) glm::mat4 model;
-    alignas(16) glm::mat4 view;
-    alignas(16) glm::mat4 proj;
-    alignas(16) glm::mat4 rayDir;
-};
-
 class Uniform
 {
 public:
-    explicit Uniform(std::shared_ptr<Device> device)
-        : m_device{device} { };
-    ~Uniform()
+    virtual ~Uniform()
     {
         for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -29,11 +19,23 @@ public:
         }
     }
 
-    template <typename BufferObject>
-    void setBufferObject()
+    virtual vk::DeviceSize getBufferSize()
     {
-        vk::DeviceSize bufferSize = sizeof(BufferObject);
+        return m_bufferSize;
+    }
 
+    void updateBuffer(void* data, int currentImage)
+    {
+        m_device->copyMemoryToAllocation(data, m_uniformBuffersAllocations[currentImage], getBufferSize());
+    }
+
+    std::vector<vk::Buffer> m_uniformBuffers;
+    std::vector<VmaAllocation> m_uniformBuffersAllocations;
+
+protected:
+    explicit Uniform(std::shared_ptr<Device> device, vk::DeviceSize bufferSize)
+        : m_device{device}
+    {
         m_uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         m_uniformBuffersAllocations.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -45,13 +47,59 @@ public:
                                    m_uniformBuffers[i],
                                    m_uniformBuffersAllocations[i]);
         }
-    }
+    };
 
-    std::vector<vk::Buffer> m_uniformBuffers;
-    std::vector<VmaAllocation> m_uniformBuffersAllocations;
-
-private:
     std::shared_ptr<Device> m_device;
+    vk::DeviceSize m_bufferSize;
+};
+
+class UniformGameObject : public Uniform
+{
+public:
+    struct UniformBufferObject
+    {
+        alignas(16) glm::mat4 model;
+        alignas(16) glm::mat4 view;
+        alignas(16) glm::mat4 proj;
+        alignas(16) glm::mat4 rayDir;
+    };
+
+    explicit UniformGameObject(std::shared_ptr<Device> device)
+        : Uniform(device, sizeof(UniformBufferObject))
+    {
+        m_bufferSize = sizeof(UniformBufferObject);
+    }
+};
+
+class UniformCamera : public Uniform
+{
+public:
+    struct UniformBufferObject
+    {
+        alignas(16) glm::mat4 rayDir;
+    };
+
+    explicit UniformCamera(std::shared_ptr<Device> device)
+        : Uniform(device, sizeof(UniformBufferObject))
+    {
+        m_bufferSize = sizeof(UniformBufferObject);
+    }
+};
+
+class UniformLight : public Uniform
+{
+public:
+    struct UniformBufferObject
+    {
+        alignas(4) glm::vec4 position;
+        alignas(4) glm::vec4 powerDensity;
+    };
+
+    explicit UniformLight(std::shared_ptr<Device> device)
+        : Uniform(device, sizeof(UniformBufferObject))
+    {
+        m_bufferSize = sizeof(UniformBufferObject);
+    }
 };
 
 } // namespace engine

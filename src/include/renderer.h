@@ -12,7 +12,13 @@ namespace engine
 /// Data per draw call
 struct DrawFrameParams
 {
-    Uniform& m_uniforms;
+    struct UniformParam
+    {
+        Uniform& m_uniform;
+        std::function<void(Uniform&, int)> m_operation;
+    };
+
+    std::vector<UniformParam> m_uniforms;
     Pipeline& m_pipeline;
     Mesh& m_mesh;
 };
@@ -32,7 +38,7 @@ public:
     void recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex, const std::vector<DrawFrameParams>& params_list);
 
     void drawFrame(const std::vector<DrawFrameParams>& params_list);
-    void updateUniformBuffer(uint32_t currentImage, Uniform& uniforms);
+    void updateUniformBuffers(uint32_t currentImage, const DrawFrameParams& params_list);
 
 private:
     void createSyncObjects();

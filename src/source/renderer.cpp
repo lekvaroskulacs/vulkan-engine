@@ -129,7 +129,10 @@ void Renderer::drawFrame(const std::vector<DrawFrameParams>& params_list)
     m_commandBuffers->GetBuffers()[m_currentFrame].reset();
 
     recordCommandBuffer(m_commandBuffers->GetBuffers()[m_currentFrame], imageIndex, params_list);
-    updateUniformBuffer(m_currentFrame, params_list[0].m_uniforms);
+    for(auto& params : params_list)
+    {
+        updateUniformBuffers(m_currentFrame, params);
+    }
 
     vk::Semaphore waitSemaphores[] = {m_imageAvailableSemaphores[m_currentFrame]};
     vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
@@ -168,24 +171,12 @@ void Renderer::drawFrame(const std::vector<DrawFrameParams>& params_list)
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void Renderer::updateUniformBuffer(uint32_t currentImage, Uniform& uniforms)
+void Renderer::updateUniformBuffers(uint32_t currentImage, const DrawFrameParams& params_list)
 {
-    static auto startTime = std::chrono::high_resolution_clock::now();
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-    engine::UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(m_camera->m_cameraPos, m_camera->m_cameraPos + m_camera->m_cameraFront, m_camera->m_cameraUp);
-    ubo.proj =
-        glm::perspective(glm::radians(45.0f), m_swapChain->GetExtent().width / (float)m_swapChain->GetExtent().height, 0.1f, 1000.0f);
-    ubo.proj[1][1] *= -1;
-
-    glm::mat4 rayDir{1.0};
-    rayDir = glm::translate(rayDir, m_camera->m_cameraPos);
-    rayDir = glm::inverse(ubo.proj * ubo.view * rayDir);
-    ubo.rayDir = rayDir;
-    // memcpy(uniforms.m_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
-    m_device->copyMemoryToAllocation(&ubo, uniforms.m_uniformBuffersAllocations[currentImage], sizeof(ubo));
+    for(auto& uniform_param : params_list.m_uniforms)
+    {
+        uniform_param.m_operation(uniform_param.m_uniform, currentImage);
+    }
 }
 
 void Renderer::createSyncObjects()

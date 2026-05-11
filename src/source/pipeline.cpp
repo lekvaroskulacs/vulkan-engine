@@ -29,19 +29,15 @@ std::vector<vk::DescriptorSet> Pipeline::GetDescriptorSets() const
     return m_descriptorSets;
 }
 
-Pipeline::Pipeline(std::shared_ptr<Device> device,
-                   std::shared_ptr<SwapChain> swapChain,
-                   const std::vector<std::shared_ptr<Uniform>>& uniforms,
-                   const std::vector<std::shared_ptr<Texture>>& textures,
-                   const CreatePipelineParams& params)
+Pipeline::Pipeline(std::shared_ptr<Device> device, std::shared_ptr<SwapChain> swapChain, const CreatePipelineParams& params)
     : m_device(device)
     , m_swapChain(swapChain)
-    , m_creationParams(params)
+    , m_recreationParams(params.m_shaderPaths)
 {
-    createDescriptorSetLayout(uniforms, textures);
-    createGraphicsPipeline(params);
-    createDescriptorPool(uniforms, textures);
-    createDescriptorSets(uniforms, textures);
+    createDescriptorSetLayout(params.m_resources);
+    createGraphicsPipeline(params.m_shaderPaths);
+    createDescriptorPool(params.m_resources);
+    createDescriptorSets(params.m_resources);
 }
 
 Pipeline::~Pipeline()
@@ -57,31 +53,39 @@ void Pipeline::recreatePipeline()
     m_device->GetDevice().waitIdle();
     m_device->GetDevice().destroyPipeline(m_graphicsPipeline, nullptr);
     m_device->GetDevice().destroyPipelineLayout(m_pipelineLayout, nullptr);
-    createGraphicsPipeline(m_creationParams);
+    createGraphicsPipeline(m_recreationParams);
 }
 
-// TODO: maybe provide uniforms and textures in <int, Uniform> map, corresponding to binding
-void Pipeline::createDescriptorSetLayout(const std::vector<std::shared_ptr<Uniform>>& uniforms,
-                                         const std::vector<std::shared_ptr<Texture>>& textures)
+void Pipeline::createDescriptorSetLayout(const std::unordered_map<uint8_t, PipelineResource>& resources)
 {
-    vk::DescriptorSetLayoutBinding uboLayoutBinding{.binding = 0,
-                                                    .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                                    .descriptorCount = 1,
-                                                    .stageFlags = vk::ShaderStageFlagBits::eVertex,
-                                                    .pImmutableSamplers = nullptr};
+    std::vector<vk::DescriptorSetLayoutBinding> layoutBindings;
+    for(auto& [binding, resource] : resources)
+    {
+        if(std::holds_alternative<Uniform*>(resource.m_resource))
+        {
+            vk::DescriptorSetLayoutBinding uboLayoutBinding{.binding = binding,
+                                                            .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                                            .descriptorCount = 1,
+                                                            .stageFlags = resource.m_stage,
+                                                            .pImmutableSamplers = nullptr};
+            layoutBindings.push_back(uboLayoutBinding);
+        }
+        else if(std::holds_alternative<Texture*>(resource.m_resource))
+        {
+            vk::DescriptorSetLayoutBinding samplerLayoutBinding{
+                .binding = binding,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .descriptorCount = 1,
+                .stageFlags = resource.m_stage,
+                .pImmutableSamplers = nullptr,
+            };
+            layoutBindings.push_back(samplerLayoutBinding);
+        }
+    }
 
-    vk::DescriptorSetLayoutBinding samplerLayoutBinding{
-        .binding = 1,
-        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-        .descriptorCount = 1,
-        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-        .pImmutableSamplers = nullptr,
-    };
-
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
     vk::DescriptorSetLayoutCreateInfo layoutInfo{
-        .bindingCount = static_cast<uint32_t>(bindings.size()),
-        .pBindings = bindings.data(),
+        .bindingCount = static_cast<uint32_t>(layoutBindings.size()),
+        .pBindings = layoutBindings.data(),
     };
 
     if(m_device->GetDevice().createDescriptorSetLayout(&layoutInfo, nullptr, &m_descriptorSetLayout) != vk::Result::eSuccess)
@@ -116,7 +120,7 @@ vk::ShaderModule Pipeline::createShaderModule(const std::string& code, shaderc_s
     return shaderModule;
 }
 
-void Pipeline::createGraphicsPipeline(const CreatePipelineParams& params)
+void Pipeline::createGraphicsPipeline(const ShaderCodePaths& params)
 {
     auto vertShaderCode = engine::utils::readFileAsString(params.m_vertexShaderPath);
     auto fragShaderCode = engine::utils::readFileAsString(params.m_fragmentShaderPath);
@@ -261,14 +265,27 @@ void Pipeline::createGraphicsPipeline(const CreatePipelineParams& params)
     m_device->GetDevice().destroyShaderModule(fragShaderModule, nullptr);
 }
 
-void Pipeline::createDescriptorPool(const std::vector<std::shared_ptr<Uniform>>& uniforms,
-                                    const std::vector<std::shared_ptr<Texture>>& textures)
+void Pipeline::createDescriptorPool(const std::unordered_map<uint8_t, PipelineResource>& resources)
 {
+    uint uniformCount = 0;
+    uint textureCount = 0;
+    for(auto& [_, resource] : resources)
+    {
+        if(std::holds_alternative<Uniform*>(resource.m_resource))
+        {
+            ++uniformCount;
+        }
+        else if(std::holds_alternative<Texture*>(resource.m_resource))
+        {
+            ++textureCount;
+        }
+    }
+
     std::array<vk::DescriptorPoolSize, 2> poolSizes{};
     poolSizes[0].type = vk::DescriptorType::eUniformBuffer;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * uniforms.size());
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * uniformCount);
     poolSizes[1].type = vk::DescriptorType::eCombinedImageSampler;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * textures.size());
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * textureCount);
 
     vk::DescriptorPoolCreateInfo poolInfo{
         .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
@@ -282,8 +299,7 @@ void Pipeline::createDescriptorPool(const std::vector<std::shared_ptr<Uniform>>&
     }
 }
 
-void Pipeline::createDescriptorSets(const std::vector<std::shared_ptr<Uniform>>& uniforms,
-                                    const std::vector<std::shared_ptr<Texture>>& textures)
+void Pipeline::createDescriptorSets(const std::unordered_map<uint8_t, PipelineResource>& resources)
 {
     std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, m_descriptorSetLayout);
     vk::DescriptorSetAllocateInfo allocInfo{
@@ -301,42 +317,41 @@ void Pipeline::createDescriptorSets(const std::vector<std::shared_ptr<Uniform>>&
     for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
         std::vector<vk::WriteDescriptorSet> descriptorWrites{};
-        descriptorWrites.resize(uniforms.size() + textures.size());
+        descriptorWrites.resize(resources.size());
         int writesPos = 0;
-        for(size_t j = 0; j < uniforms.size(); j++)
-        {
-            vk::DescriptorBufferInfo bufferInfo{
-                .buffer = uniforms[j]->m_uniformBuffers[i],
-                .offset = 0,
-                .range = sizeof(engine::UniformBufferObject),
-            };
 
+        for(auto& [binding, resource] : resources)
+        {
             descriptorWrites[writesPos].sType = vk::StructureType::eWriteDescriptorSet;
             descriptorWrites[writesPos].dstSet = m_descriptorSets[i];
-            descriptorWrites[writesPos].dstBinding = writesPos;
+            descriptorWrites[writesPos].dstBinding = binding;
             descriptorWrites[writesPos].dstArrayElement = 0;
-            descriptorWrites[writesPos].descriptorType = vk::DescriptorType::eUniformBuffer;
             descriptorWrites[writesPos].descriptorCount = 1;
-            descriptorWrites[writesPos].pBufferInfo = &bufferInfo;
 
-            writesPos++;
-        }
+            if(std::holds_alternative<Uniform*>(resource.m_resource))
+            {
+                auto& uniform = std::get<Uniform*>(resource.m_resource);
+                vk::DescriptorBufferInfo bufferInfo{
+                    .buffer = uniform->m_uniformBuffers[i],
+                    .offset = 0,
+                    .range = uniform->getBufferSize(), //TODO : query uniform object type from resource
+                };
 
-        for(size_t j = 0; j < textures.size(); j++)
-        {
-            vk::DescriptorImageInfo imageInfo{
-                .sampler = textures[j]->GetSampler(),
-                .imageView = textures[j]->GetImageView(),
-                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-            };
+                descriptorWrites[writesPos].descriptorType = vk::DescriptorType::eUniformBuffer;
+                descriptorWrites[writesPos].pBufferInfo = &bufferInfo;
+            }
+            else if(std::holds_alternative<Texture*>(resource.m_resource))
+            {
+                auto& texture = std::get<Texture*>(resource.m_resource);
+                vk::DescriptorImageInfo imageInfo{
+                    .sampler = texture->GetSampler(),
+                    .imageView = texture->GetImageView(),
+                    .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+                };
 
-            descriptorWrites[writesPos].sType = vk::StructureType::eWriteDescriptorSet;
-            descriptorWrites[writesPos].dstSet = m_descriptorSets[i];
-            descriptorWrites[writesPos].dstBinding = writesPos;
-            descriptorWrites[writesPos].dstArrayElement = 0;
-            descriptorWrites[writesPos].descriptorType = vk::DescriptorType::eCombinedImageSampler;
-            descriptorWrites[writesPos].descriptorCount = 1;
-            descriptorWrites[writesPos].pImageInfo = &imageInfo;
+                descriptorWrites[writesPos].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+                descriptorWrites[writesPos].pImageInfo = &imageInfo;
+            }
 
             writesPos++;
         }

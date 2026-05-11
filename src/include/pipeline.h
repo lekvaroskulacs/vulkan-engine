@@ -14,10 +14,23 @@
 namespace engine
 {
 
-struct CreatePipelineParams
+using Resource = std::variant<Uniform*, Texture*>;
+struct PipelineResource
+{
+    vk::ShaderStageFlags m_stage;
+    Resource m_resource; /// DO NOT take ownership of this object! It may be deleted during runtime.
+};
+
+struct ShaderCodePaths
 {
     std::string m_vertexShaderPath;
     std::string m_fragmentShaderPath;
+};
+
+struct CreatePipelineParams
+{
+    ShaderCodePaths m_shaderPaths;
+    std::unordered_map<uint8_t, PipelineResource> m_resources;
 };
 
 class Pipeline
@@ -29,29 +42,21 @@ public:
     vk::DescriptorPool GetDescriptorPool() const;
     std::vector<vk::DescriptorSet> GetDescriptorSets() const;
 
-    explicit Pipeline(std::shared_ptr<Device> device,
-                      std::shared_ptr<SwapChain> swapChain,
-                      const std::vector<std::shared_ptr<Uniform>>& uniforms,
-                      const std::vector<std::shared_ptr<Texture>>& textures,
-                      const CreatePipelineParams& params);
+    explicit Pipeline(std::shared_ptr<Device> device, std::shared_ptr<SwapChain> swapChain, const CreatePipelineParams& params);
     ~Pipeline();
 
     void recreatePipeline();
 
 private:
-    void createDescriptorSetLayout(const std::vector<std::shared_ptr<Uniform>>& uniforms,
-                                   const std::vector<std::shared_ptr<Texture>>& textures);
+    void createDescriptorSetLayout(const std::unordered_map<uint8_t, PipelineResource>& resources);
     vk::ShaderModule createShaderModule(const std::string& code, shaderc_shader_kind kind, const std::string& inputFile);
-    void createGraphicsPipeline(const CreatePipelineParams& params);
+    void createGraphicsPipeline(const ShaderCodePaths& paths);
 
-    void createDescriptor();
-    void createDescriptorPool(const std::vector<std::shared_ptr<Uniform>>& uniforms,
-                              const std::vector<std::shared_ptr<Texture>>& textures);
-    void createDescriptorSets(const std::vector<std::shared_ptr<Uniform>>& uniforms,
-                              const std::vector<std::shared_ptr<Texture>>& textures);
+    void createDescriptorPool(const std::unordered_map<uint8_t, PipelineResource>& resources);
+    void createDescriptorSets(const std::unordered_map<uint8_t, PipelineResource>& resources);
 
     // Cached for recreation
-    CreatePipelineParams m_creationParams;
+    ShaderCodePaths m_recreationParams;
 
     vk::DescriptorPool m_descriptorPool;
     std::vector<vk::DescriptorSet> m_descriptorSets;

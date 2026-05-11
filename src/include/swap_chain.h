@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vulkan/vulkan.hpp>
 
 #include "device.h"
@@ -56,5 +57,6 @@ private:
     vk::ImageView m_depthImageView;
 
     vk::RenderPass m_renderPass;
+    std::unordered_map<RenderPassStage, vk::RenderPass> m_renderPasses;
 };
 } // namespace engine

@@ -1,7 +1,10 @@
 #pragma once
 
+#include "swap_chain.h"
+
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace engine
 {
@@ -9,22 +12,17 @@ namespace engine
 class Camera
 {
 public:
-    Camera(GLFWwindow* window)
+    Camera(GLFWwindow* window, std::shared_ptr<SwapChain> swapChain)
+        : m_swapChain{swapChain}
     {
         glfwSetWindowUserPointer(window, this);
         glfwSetCursorPosCallback(window, engine::Camera::mouseCallback);
+
+        m_view = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
+        m_proj = glm::perspective(
+            glm::radians(45.0f), m_swapChain->GetExtent().width / (float)m_swapChain->GetExtent().height, 0.1f, 1000.0f);
+        m_proj[1][1] *= -1;
     }
-
-    glm::vec3 m_cameraPos = glm::vec3(2.0f, 0.0f, 2.0f);
-    glm::vec3 m_cameraFront = glm::normalize(glm::vec3(-1.0f, 0.0f, -1.0f));
-    glm::vec3 m_cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-
-    float yaw = -135.0f; // Facing (-1, -1, 0)
-    float pitch = 0.0f;
-    float lastX = 400.0f;
-    float lastY = 300.0f;
-    bool firstMouse = true;
-    float sensitivity = 0.1f;
 
     void processInput(GLFWwindow* window, float dt)
     {
@@ -41,6 +39,11 @@ public:
             m_cameraPos.y -= cameraSpeed;
         if(glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
             m_cameraPos.y += cameraSpeed;
+
+        m_view = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
+        m_proj = glm::perspective(
+            glm::radians(45.0f), m_swapChain->GetExtent().width / (float)m_swapChain->GetExtent().height, 0.1f, 1000.0f);
+        m_proj[1][1] *= -1;
     }
 
     static void mouseCallback(GLFWwindow* window, double xpos, double ypos)
@@ -86,6 +89,22 @@ public:
         front.z = sin(glm::radians(cam->yaw)) * cos(glm::radians(cam->pitch));
         cam->m_cameraFront = glm::normalize(front);
     }
+
+    std::shared_ptr<SwapChain> m_swapChain;
+
+    glm::vec3 m_cameraPos = glm::vec3(2.0f, 0.0f, 2.0f);
+    glm::vec3 m_cameraFront = glm::normalize(glm::vec3(-1.0f, 0.0f, -1.0f));
+    glm::vec3 m_cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+    glm::mat4 m_view;
+    glm::mat4 m_proj;
+
+    float yaw = -135.0f; // Facing (-1, -1, 0)
+    float pitch = 0.0f;
+    float lastX = 400.0f;
+    float lastY = 300.0f;
+    bool firstMouse = true;
+    float sensitivity = 0.1f;
 };
 
 } // namespace engine
