@@ -31,6 +31,7 @@ struct CreatePipelineParams
 {
     ShaderCodePaths m_shaderPaths;
     std::unordered_map<uint8_t, PipelineResource> m_resources;
+    bool m_isShadowStage = false;
 };
 
 class Pipeline
@@ -51,12 +52,15 @@ private:
     void createDescriptorSetLayout(const std::unordered_map<uint8_t, PipelineResource>& resources);
     vk::ShaderModule createShaderModule(const std::string& code, shaderc_shader_kind kind, const std::string& inputFile);
     void createGraphicsPipeline(const ShaderCodePaths& paths);
+    void createShadowPipeline(const ShaderCodePaths& paths);
 
     void createDescriptorPool(const std::unordered_map<uint8_t, PipelineResource>& resources);
     void createDescriptorSets(const std::unordered_map<uint8_t, PipelineResource>& resources);
 
     // Cached for recreation
     ShaderCodePaths m_recreationParams;
+    std::function<void(const ShaderCodePaths&)> m_recreatePipeline;
+    bool m_shadowMap = false;
 
     vk::DescriptorPool m_descriptorPool;
     std::vector<vk::DescriptorSet> m_descriptorSets;

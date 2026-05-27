@@ -14,6 +14,8 @@ namespace engine
 struct UserInterfaceObjectReferences
 {
     std::vector<std::reference_wrapper<Pipeline>> m_pipelines;
+    glm::vec3* m_light_pos;
+    glm::vec3* m_light_facing;
 };
 
 class UserInterface
@@ -79,6 +81,16 @@ public:
                 {
                     pipeline.recreatePipeline();
                 }
+            }
+
+            if(ImGui::SliderFloat3("Light position", &refs.m_light_pos->x, -4.0f, 4.0f))
+            {
+                // if value changed
+            }
+
+            if(ImGui::SliderFloat3("Light target point", &refs.m_light_facing->x, -4.0f, 4.0f))
+            {
+                // if value changed
             }
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);

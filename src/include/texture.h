@@ -21,7 +21,16 @@ struct TextureCubeParams
     std::array<std::string, 6> m_filepaths;
 };
 
-using TextureParams = std::variant<Texture2DParams, TextureCubeParams>;
+struct TextureFramebufferParams
+{
+    uint32_t m_width, m_height;
+    vk::ImageUsageFlags m_usageFlags;
+    vk::ImageAspectFlags m_aspectFlags;
+    vk::Format m_format;
+    bool m_isCube = false;
+};
+
+using TextureParams = std::variant<Texture2DParams, TextureCubeParams, TextureFramebufferParams>;
 
 class Texture
 {
@@ -31,15 +40,30 @@ public:
         return m_textureImageView;
     }
 
+    const vk::ImageView* GetImageView_ptr() const
+    {
+        return &m_textureImageView;
+    }
+
     vk::Sampler GetSampler() const
     {
         return m_textureSampler;
     }
 
-    explicit Texture(std::shared_ptr<Device> device, std::shared_ptr<CommandBuffer> commandBuffer, const TextureParams& params)
+    vk::ImageAspectFlags GetAspectFlags() const
+    {
+        if(auto* params = std::get_if<TextureFramebufferParams>(&m_params))
+        {
+            return params->m_aspectFlags;
+        }
+
+        return vk::ImageAspectFlagBits::eColor;
+    }
+
+    explicit Texture(std::shared_ptr<Device> device, std::shared_ptr<CommandBuffer> commandBuffer, TextureParams&& params)
         : m_device(device)
         , m_commandBuffer(commandBuffer)
-        , m_params(params)
+        , m_params(std::move(params))
     {
         if(std::holds_alternative<Texture2DParams>(params))
         {
@@ -52,6 +76,12 @@ public:
             createTextureCubeImage();
             createTextureCubeImageView();
             createTextureSampler();
+        }
+        else if(std::holds_alternative<TextureFramebufferParams>(params))
+        {
+            createTextureFramebufferImage();
+            createTextureFramebufferImageView();
+            createTextureShadowSampler();
         }
     }
 
@@ -82,8 +112,8 @@ private:
             .compareEnable = vk::False,
             .compareOp = vk::CompareOp::eAlways,
             .minLod = 0.0f,
-            .maxLod = 0.0f,
-            .borderColor = vk::BorderColor::eIntOpaqueBlack,
+            .maxLod = 1.0f,
+            .borderColor = vk::BorderColor::eIntOpaqueWhite,
             .unnormalizedCoordinates = vk::False,
         };
 
@@ -319,9 +349,75 @@ private:
         m_commandBuffer->endSingleTimeCommands(commandBuffer);
     }
 
+    void createTextureFramebufferImage()
+    {
+        auto* params = std::get_if<TextureFramebufferParams>(&m_params);
+
+        vk::DeviceSize imageSize = params->m_width * params->m_height;
+        uint32_t texWidth = params->m_width;
+        uint32_t texHeight = params->m_height;
+        uint32_t arrayLayers = params->m_isCube ? 6 : 1;
+        vk::ImageCreateFlags createFlags{};
+
+        if(params->m_isCube)
+        {
+            imageSize *= 6;
+            createFlags = vk::ImageCreateFlagBits::eCubeCompatible;
+        }
+
+        m_device->createImage(texWidth,
+                              texHeight,
+                              params->m_format,
+                              vk::ImageTiling::eOptimal,
+                              params->m_usageFlags,
+                              vk::MemoryPropertyFlagBits::eDeviceLocal,
+                              m_textureImage,
+                              m_textureImageAllocation,
+                              createFlags,
+                              arrayLayers);
+    }
+
+    void createTextureFramebufferImageView()
+    {
+        auto* params = std::get_if<TextureFramebufferParams>(&m_params);
+        uint32_t layers = params->m_isCube ? 6 : 1;
+        vk::ImageViewType viewType = params->m_isCube ? vk::ImageViewType::eCube : vk::ImageViewType::e2D;
+
+        m_textureImageView = m_device->createImageView(m_textureImage, params->m_format, params->m_aspectFlags, layers, viewType);
+    }
+
+    void createTextureShadowSampler()
+    {
+        vk::PhysicalDeviceProperties properties{};
+        m_device->GetPhysicalDevice().getProperties(&properties);
+
+        vk::SamplerCreateInfo samplerInfo{
+            .magFilter = vk::Filter::eLinear,
+            .minFilter = vk::Filter::eLinear,
+            .mipmapMode = vk::SamplerMipmapMode::eLinear,
+            .addressModeU = vk::SamplerAddressMode::eClampToBorder,
+            .addressModeV = vk::SamplerAddressMode::eClampToBorder,
+            .addressModeW = vk::SamplerAddressMode::eClampToBorder,
+            .mipLodBias = 0.0f,
+            .anisotropyEnable = vk::True,
+            .maxAnisotropy = properties.limits.maxSamplerAnisotropy,
+            .compareEnable = vk::False,
+            .compareOp = vk::CompareOp::eAlways,
+            .minLod = 0.0f,
+            .maxLod = 1.0f,
+            .borderColor = vk::BorderColor::eIntOpaqueWhite,
+            .unnormalizedCoordinates = vk::False,
+        };
+
+        if(m_device->GetDevice().createSampler(&samplerInfo, nullptr, &m_textureSampler) != vk::Result::eSuccess)
+        {
+            throw std::runtime_error("failed to create texture sampler!");
+        }
+    }
+
     std::shared_ptr<Device> m_device;
     std::shared_ptr<CommandBuffer> m_commandBuffer;
-    const TextureParams& m_params;
+    TextureParams m_params;
 
     vk::Image m_textureImage;
     VmaAllocation m_textureImageAllocation;

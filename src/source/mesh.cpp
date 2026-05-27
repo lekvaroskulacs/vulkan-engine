@@ -72,7 +72,9 @@ void Mesh::loadModel(std::string modelPath)
             vertex.m_texCoord = {attrib.texcoords[2 * index.texcoord_index + 0],
                                  1.0f - attrib.texcoords[2 * index.texcoord_index + 1]};
 
-            vertex.m_color = {1.0f, 1.0f, 1.0f};
+            vertex.m_normal = {attrib.normals[3 * index.normal_index + 0],
+                               attrib.normals[3 * index.normal_index + 1],
+                               attrib.normals[3 * index.normal_index + 2]};
 
             if(uniqueVertices.count(vertex) == 0)
             {

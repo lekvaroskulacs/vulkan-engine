@@ -12,14 +12,18 @@ namespace engine
 /// Data per draw call
 struct DrawFrameParams
 {
-    struct UniformParam
+    struct PerRenderPassParams
     {
-        Uniform& m_uniform;
-        std::function<void(Uniform&, int)> m_operation;
+        struct UniformParam
+        {
+            Uniform& m_uniform;
+            std::function<void(Uniform&, int)> m_operation;
+        };
+        std::vector<UniformParam> m_uniforms;
+        Pipeline& m_pipeline;
     };
 
-    std::vector<UniformParam> m_uniforms;
-    Pipeline& m_pipeline;
+    std::unordered_map<RenderPassStage, PerRenderPassParams> m_renderPassInfo;
     Mesh& m_mesh;
 };
 

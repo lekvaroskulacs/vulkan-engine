@@ -2,9 +2,11 @@
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 #include <chrono>
 
@@ -33,6 +35,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include "include/camera.h"
 #include "include/command_buffer.h"
 #include "include/device.h"
+#include "include/game_object.h"
 #include "include/mesh.h"
 #include "include/pipeline.h"
 #include "include/renderer.h"
@@ -52,19 +55,14 @@ public:
     {
         m_window = std::make_shared<engine::Window>();
         m_device = std::make_shared<engine::Device>(m_window);
-        m_swapChain = std::make_shared<engine::SwapChain>(m_device, m_window);
-        m_camera = std::make_shared<engine::Camera>(m_window->Get(), m_swapChain);
         m_commandBuffer = std::make_shared<engine::CommandBuffer>(m_device);
-        m_ui = std::make_shared<engine::UserInterface>(m_device, m_swapChain->GetRenderPass());
+        m_swapChain = std::make_shared<engine::SwapChain>(m_device, m_commandBuffer, m_window);
+        m_camera = std::make_shared<engine::Camera>(m_window->Get(), m_swapChain);
+        m_ui = std::make_shared<engine::UserInterface>(m_device, m_swapChain->GetRenderPass(engine::RenderPassStage::General));
         m_renderer = std::make_shared<engine::Renderer>(m_device, m_swapChain, m_commandBuffer, m_camera, m_ui);
         m_window->SetResizeCallback(engine::Renderer::framebufferResizeCallback);
 
-        engine::Texture2DParams params{.m_filepath = "textures/viking_room.png"};
-        m_texture = std::make_shared<engine::Texture>(m_device, m_commandBuffer, params);
-
-        engine::Texture2DParams params2{.m_filepath = "textures/Skull.jpg"};
-        m_skull_tex = std::make_shared<engine::Texture>(m_device, m_commandBuffer, params2);
-
+        engine::Texture2DParams vikingTexParams{.m_filepath = "textures/viking_room.png"};
         engine::TextureCubeParams env_params{.m_filepaths = {
                                                  "textures/skybox1.jpg",
                                                  "textures/skybox2.jpg",
@@ -73,34 +71,65 @@ public:
                                                  "textures/skybox5.jpg",
                                                  "textures/skybox6.jpg",
                                              }};
-        m_envTex = std::make_shared<engine::Texture>(m_device, m_commandBuffer, env_params);
 
-        m_skull = std::make_unique<engine::Mesh>(m_device, m_commandBuffer, "models/skull.obj");
-        m_viking_room = std::make_unique<engine::Mesh>(m_device, m_commandBuffer, engine::MODEL_PATH);
-        m_cube = std::make_unique<engine::Mesh>(m_device, m_commandBuffer, "models/cube.obj");
-        m_fullscreen_quad = std::make_unique<engine::FullscreenQuadMesh>(m_device, m_commandBuffer);
+        auto cameraBinding = [&](engine::Uniform& uniform, int currentImage) {
+            auto* camera = dynamic_cast<engine::UniformCamera*>(&uniform);
+            if(camera)
+            {
+                engine::UniformCamera::UniformBufferObject ubo;
+                glm::mat4 rayDir{1.0};
+                rayDir = glm::translate(rayDir, m_camera->m_cameraPos);
+                rayDir = glm::inverse(m_camera->m_proj * m_camera->m_view * rayDir);
+                ubo.rayDir = rayDir;
+                ubo.position = glm::vec4(m_camera->m_cameraPos, 1.0);
+                camera->updateBuffer(&ubo, currentImage);
+            }
+        };
 
-        m_uniform_viking = std::make_shared<engine::UniformGameObject>(m_device);
-        m_uniform_camera = std::make_unique<engine::UniformCamera>(m_device);
+        auto lightBinding = [&](engine::Uniform& uniform, int currentImage) {
+            auto* light = dynamic_cast<engine::UniformLight*>(&uniform);
+            if(light)
+            {
+                engine::UniformLight::UniformBufferObject ubo{};
+                ubo.position = glm::vec4(m_light_pos, 1.0f);
+                ubo.powerDensity = glm::vec4(1.0f);
+                glm::mat4 depthProjectionMatrix =
+                    glm::perspective(glm::radians(90.0f), 1.0f, engine::Camera::zNear, engine::Camera::zFar);
 
-        engine::PipelineResource viking_uniform = {vk::ShaderStageFlagBits::eVertex, m_uniform_viking.get()};
-        engine::PipelineResource sky_uniform = {vk::ShaderStageFlagBits::eVertex, m_uniform_camera.get()};
-        engine::PipelineResource viking_texture = {vk::ShaderStageFlagBits::eFragment, m_texture.get()};
-        engine::PipelineResource skull_texture = {vk::ShaderStageFlagBits::eFragment, m_skull_tex.get()};
-        engine::PipelineResource env_texture = {vk::ShaderStageFlagBits::eFragment, m_envTex.get()};
+                glm::mat4 depthViewMatrix = glm::lookAt(glm::vec3(ubo.position), m_light_facing, glm::vec3(0, 1, 0));
+                depthProjectionMatrix[1][1] *= -1;
+                ubo.shadowViewProj = depthProjectionMatrix * depthViewMatrix;
+                light->updateBuffer(&ubo, currentImage);
+            }
+        };
 
-        engine::CreatePipelineParams pipelineParams{
-            .m_shaderPaths{.m_vertexShaderPath = "shaders/triangle.vert", .m_fragmentShaderPath = "shaders/triangle.frag"},
-            .m_resources = {{0, viking_uniform}, {1, viking_texture}}};
-        m_viking_pipeline = std::make_unique<engine::Pipeline>(m_device, m_swapChain, pipelineParams);
+        auto debug = std::make_unique<engine::FullscreenQuadMesh>(m_device, m_commandBuffer);
+        m_testInterior = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, "models/InteriorTest.obj");
+        m_testInterior->addUniform<engine::UniformGameObject>(
+            0, vk::ShaderStageFlagBits::eVertex, [&](engine::Uniform& uniform, int currentImage) {
+                auto* mvp = dynamic_cast<engine::UniformGameObject*>(&uniform);
+                if(mvp)
+                {
+                    engine::UniformGameObject::UniformBufferObject ubo{};
+                    ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+                    ubo.view = m_camera->m_view;
+                    ubo.proj = m_camera->m_proj;
+                    mvp->updateBuffer(&ubo, currentImage);
+                }
+            });
+        m_testInterior->addTexture(1, vk::ShaderStageFlagBits::eFragment, std::move(vikingTexParams));
+        m_testInterior->addUniform<engine::UniformLight>(
+            2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, lightBinding);
+        m_testInterior->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraBinding);
+        m_testInterior->finalizeGameObject(
+            m_swapChain, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/max_blinn.frag"}, true);
 
-        pipelineParams.m_resources = {{0, viking_uniform}, {1, skull_texture}};
-        m_skull_pipeline = std::make_unique<engine::Pipeline>(m_device, m_swapChain, pipelineParams);
-
-        pipelineParams.m_shaderPaths.m_vertexShaderPath = "shaders/env.vert";
-        pipelineParams.m_shaderPaths.m_fragmentShaderPath = "shaders/env.frag";
-        pipelineParams.m_resources = {{0, sky_uniform}, {1, env_texture}};
-        m_env_pipeline = std::make_unique<engine::Pipeline>(m_device, m_swapChain, pipelineParams);
+        auto fsquad = std::make_unique<engine::FullscreenQuadMesh>(m_device, m_commandBuffer);
+        m_skybox = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, std::move(fsquad));
+        m_skybox->addUniform<engine::UniformCamera>(0, vk::ShaderStageFlagBits::eVertex, cameraBinding);
+        m_skybox->addTexture(1, vk::ShaderStageFlagBits::eFragment, std::move(env_params));
+        m_skybox->finalizeGameObject(m_swapChain,
+                                     {.m_vertexShaderPath = "shaders/env.vert", .m_fragmentShaderPath = "shaders/env.frag"});
 
         mainLoop();
     }
@@ -110,25 +139,16 @@ private:
     std::shared_ptr<engine::Device> m_device;
     std::shared_ptr<engine::SwapChain> m_swapChain;
     std::shared_ptr<engine::CommandBuffer> m_commandBuffer;
-    std::shared_ptr<engine::Uniform> m_uniform_viking;
     std::shared_ptr<engine::Renderer> m_renderer;
     std::shared_ptr<engine::UserInterface> m_ui;
 
-    std::unique_ptr<engine::Pipeline> m_viking_pipeline;
-    std::shared_ptr<engine::Texture> m_texture;
-    std::unique_ptr<engine::Mesh> m_viking_room;
-
-    std::unique_ptr<engine::Pipeline> m_skull_pipeline;
-    std::shared_ptr<engine::Texture> m_skull_tex;
-    std::unique_ptr<engine::Mesh> m_skull;
-
-    std::unique_ptr<engine::Pipeline> m_env_pipeline;
-    std::shared_ptr<engine::Texture> m_envTex;
-    std::unique_ptr<engine::Mesh> m_cube;
-    std::unique_ptr<engine::Mesh> m_fullscreen_quad;
-
     std::shared_ptr<engine::Camera> m_camera;
-    std::unique_ptr<engine::Uniform> m_uniform_camera;
+
+    std::unique_ptr<engine::GameObject> m_testInterior;
+    std::unique_ptr<engine::GameObject> m_skybox;
+
+    glm::vec3 m_light_pos = glm::vec3(-2.0f, 0.1f, 0.0f);
+    glm::vec3 m_light_facing = glm::vec3(1.0f);
 
     void mainLoop()
     {
@@ -145,46 +165,14 @@ private:
             m_camera->processInput(m_window->Get(), time);
 
             engine::UserInterfaceObjectReferences refs{};
-            refs.m_pipelines = {*m_viking_pipeline, *m_env_pipeline, *m_skull_pipeline};
+            refs.m_pipelines = {m_testInterior->GetPipeline(), m_skybox->GetPipeline(), m_testInterior->GetShadowPipeline()};
+            refs.m_light_pos = &m_light_pos;
+            refs.m_light_facing = &m_light_facing;
             m_ui->buildInterface(refs);
 
-            engine::DrawFrameParams::UniformParam viking_uniform{
-                .m_uniform = *m_uniform_viking, .m_operation = [&](engine::Uniform& uniform, int currentImage) {
-                    auto* mvp = dynamic_cast<engine::UniformGameObject*>(&uniform);
-                    if(mvp)
-                    {
-                        static auto startTime = std::chrono::high_resolution_clock::now();
-                        auto currentTime = std::chrono::high_resolution_clock::now();
-                        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-                        engine::UniformGameObject::UniformBufferObject ubo{};
-                        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-                        ubo.view = m_camera->m_view;
-                        ubo.proj = m_camera->m_proj;
-                        mvp->updateBuffer(&ubo, currentImage);
-                    }
-                }};
-
-            engine::DrawFrameParams::UniformParam sky_uniform{
-                .m_uniform = *m_uniform_camera, .m_operation = [&](engine::Uniform& uniform, int currentImage) {
-                    auto* camera = dynamic_cast<engine::UniformCamera*>(&uniform);
-                    if(camera)
-                    {
-                        engine::UniformCamera::UniformBufferObject ubo;
-                        glm::mat4 rayDir{1.0};
-                        rayDir = glm::translate(rayDir, m_camera->m_cameraPos);
-                        rayDir = glm::inverse(m_camera->m_proj * m_camera->m_view * rayDir);
-                        ubo.rayDir = rayDir;
-                        camera->updateBuffer(&ubo, currentImage);
-                    }
-                }};
-
             std::vector<engine::DrawFrameParams> params_list;
-            engine::DrawFrameParams params{.m_uniforms = {viking_uniform}, .m_pipeline = *m_viking_pipeline, .m_mesh = *m_viking_room};
-            engine::DrawFrameParams sky{.m_uniforms = {sky_uniform}, .m_pipeline = *m_env_pipeline, .m_mesh = *m_fullscreen_quad};
-            engine::DrawFrameParams skull{.m_uniforms = {viking_uniform}, .m_pipeline = *m_skull_pipeline, .m_mesh = *m_skull};
-            params_list.push_back(params);
-            params_list.push_back(sky);
-            params_list.push_back(skull);
+            params_list.push_back(m_skybox->getDrawFrameParams());
+            params_list.push_back(m_testInterior->getDrawFrameParams());
             m_renderer->drawFrame(params_list);
         }
 

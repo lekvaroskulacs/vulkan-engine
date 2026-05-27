@@ -7,42 +7,63 @@
 namespace engine
 {
 
-SwapChain::SwapChain(std::shared_ptr<Device> device, std::shared_ptr<Window> window)
+SwapChain::SwapChain(std::shared_ptr<Device> device, std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Window> window)
     : m_device{device}
     , m_window{window}
+    , m_commandBuffer{commandBuffer}
 {
     createSwapChain();
-    createImageViews();
-    createRenderPass();
+    createGeneralImageViews();
+    createGeneralRenderPass();
     createDepthResources();
-    createFrameBuffers();
+    createGeneralFrameBuffers();
+    createShadowMapRenderTargets();
+    createShadowMapRenderPass();
+    createShadowMapFrameBuffers();
 }
 
 SwapChain::~SwapChain()
 {
     cleanupSwapChain();
-    m_device->GetDevice().destroyRenderPass(m_renderPass, nullptr);
+    for(auto& pass : m_renderPasses)
+    {
+        m_device->GetDevice().destroyRenderPass(pass.second, nullptr);
+    }
 }
 
 VkSwapchainKHR SwapChain::Get()
 {
     return m_swapChain;
 }
+
 vk::Extent2D SwapChain::GetExtent()
 {
     return m_swapChainExtent;
 }
-VkRenderPass SwapChain::GetRenderPass()
+
+vk::RenderPass SwapChain::GetRenderPass(RenderPassStage stage)
 {
-    return m_renderPass;
+    return m_renderPasses.at(stage);
 }
-std::vector<vk::Framebuffer> SwapChain::GetFrameBuffers()
+
+std::vector<vk::Framebuffer> SwapChain::GetFrameBuffers(RenderPassStage stage)
 {
-    return m_swapChainFramebuffers;
+    return m_framebuffers[stage];
 }
-std::vector<vk::Image> SwapChain::GetImages()
+
+std::vector<vk::Image> SwapChain::GetImages(RenderPassStage stage)
 {
-    return m_swapChainImages;
+    if(stage == RenderPassStage::General)
+    {
+        return m_presentImages;
+    }
+
+    return {};
+}
+
+Texture* SwapChain::GetRenderTarget(RenderPassStage stage)
+{
+    return m_renderTargets.at(stage).at(0).get();
 }
 
 void SwapChain::recreateSwapChain()
@@ -57,9 +78,12 @@ void SwapChain::recreateSwapChain()
     m_device->GetDevice().waitIdle();
     cleanupSwapChain();
     createSwapChain();
-    createImageViews();
+    createGeneralImageViews();
     createDepthResources();
-    createFrameBuffers();
+    createGeneralFrameBuffers();
+    createShadowMapRenderTargets();
+    createShadowMapRenderPass();
+    createShadowMapFrameBuffers();
 }
 
 vk::SurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats)
@@ -115,14 +139,14 @@ void SwapChain::createSwapChain()
     vk::PresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.m_presentModes);
     vk::Extent2D extent = chooseSwapExtent(swapChainSupport.m_capabilities);
 
-    uint32_t imageCount = swapChainSupport.m_capabilities.minImageCount + 1;
-    if(swapChainSupport.m_capabilities.maxImageCount > 0 && imageCount > swapChainSupport.m_capabilities.maxImageCount)
+    m_imageCount = swapChainSupport.m_capabilities.minImageCount + 1;
+    if(swapChainSupport.m_capabilities.maxImageCount > 0 && m_imageCount > swapChainSupport.m_capabilities.maxImageCount)
     {
-        imageCount = swapChainSupport.m_capabilities.maxImageCount;
+        m_imageCount = swapChainSupport.m_capabilities.maxImageCount;
     }
 
     vk::SwapchainCreateInfoKHR createInfo{.surface = m_device->GetSurface(),
-                                          .minImageCount = imageCount,
+                                          .minImageCount = m_imageCount,
                                           .imageFormat = surfaceFormat.format,
                                           .imageColorSpace = surfaceFormat.colorSpace,
                                           .imageExtent = extent,
@@ -156,26 +180,31 @@ void SwapChain::createSwapChain()
     {
         throw std::runtime_error("Failed to create swap chain!");
     }
-
-    [[maybe_unused]] auto result = m_device->GetDevice().getSwapchainImagesKHR(m_swapChain, &imageCount, nullptr);
-    m_swapChainImages.resize(imageCount);
-    result = m_device->GetDevice().getSwapchainImagesKHR(m_swapChain, &imageCount, m_swapChainImages.data());
     m_swapChainImageFormat = surfaceFormat.format;
     m_swapChainExtent = extent;
+
+    createGeneralImages(m_imageCount);
 }
 
-void SwapChain::createImageViews()
+void SwapChain::createGeneralImages(uint32_t imageCount)
 {
-    m_swapChainImageViews.resize(m_swapChainImages.size());
+    [[maybe_unused]] auto result = m_device->GetDevice().getSwapchainImagesKHR(m_swapChain, &imageCount, nullptr);
+    m_presentImages.resize(imageCount);
+    result = m_device->GetDevice().getSwapchainImagesKHR(m_swapChain, &imageCount, m_presentImages.data());
+}
 
-    for(size_t i = 0; i < m_swapChainImages.size(); i++)
+void SwapChain::createGeneralImageViews()
+{
+    m_presentImageViews.resize(m_presentImages.size());
+
+    for(size_t i = 0; i < m_presentImages.size(); i++)
     {
-        m_swapChainImageViews[i] =
-            m_device->createImageView(m_swapChainImages[i], m_swapChainImageFormat, vk::ImageAspectFlagBits::eColor);
+        m_presentImageViews[i] =
+            m_device->createImageView(m_presentImages[i], m_swapChainImageFormat, vk::ImageAspectFlagBits::eColor);
     }
 }
 
-void SwapChain::createRenderPass()
+void SwapChain::createGeneralRenderPass()
 {
     vk::AttachmentDescription colorAttachment{.format = m_swapChainImageFormat,
                                               .samples = vk::SampleCountFlagBits::e1,
@@ -222,28 +251,30 @@ void SwapChain::createRenderPass()
                                             .dependencyCount = 1,
                                             .pDependencies = &dependency};
 
-    if(m_device->GetDevice().createRenderPass(&renderPassInfo, nullptr, &m_renderPass) != vk::Result::eSuccess)
+    if(m_device->GetDevice().createRenderPass(&renderPassInfo, nullptr, &m_renderPasses[RenderPassStage::General]) !=
+       vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to create render pass!");
     }
 }
 
-void SwapChain::createFrameBuffers()
+void SwapChain::createGeneralFrameBuffers()
 {
-    m_swapChainFramebuffers.resize(m_swapChainImageViews.size());
+    m_framebuffers[RenderPassStage::General].resize(m_presentImageViews.size());
 
-    for(size_t i = 0; i < m_swapChainImageViews.size(); i++)
+    for(size_t i = 0; i < m_presentImageViews.size(); i++)
     {
-        std::array<vk::ImageView, 2> attachments = {m_swapChainImageViews[i], m_depthImageView};
+        std::array<vk::ImageView, 2> attachments = {m_presentImageViews[i], m_depthImageView};
 
-        vk::FramebufferCreateInfo frameBufferInfo{.renderPass = m_renderPass,
+        vk::FramebufferCreateInfo frameBufferInfo{.renderPass = m_renderPasses[RenderPassStage::General],
                                                   .attachmentCount = static_cast<uint32_t>(attachments.size()),
                                                   .pAttachments = attachments.data(),
                                                   .width = m_swapChainExtent.width,
                                                   .height = m_swapChainExtent.height,
                                                   .layers = 1};
 
-        if(m_device->GetDevice().createFramebuffer(&frameBufferInfo, nullptr, &m_swapChainFramebuffers[i]) != vk::Result::eSuccess)
+        if(m_device->GetDevice().createFramebuffer(&frameBufferInfo, nullptr, &m_framebuffers[RenderPassStage::General][i]) !=
+           vk::Result::eSuccess)
         {
             throw std::runtime_error("Failed to create framebuffer!");
         }
@@ -263,6 +294,99 @@ void SwapChain::createDepthResources()
                           m_depthImage,
                           m_depthImageAllocation);
     m_depthImageView = m_device->createImageView(m_depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
+}
+
+void SwapChain::createShadowMapRenderTargets()
+{
+    // maybe also pass format
+    TextureFramebufferParams params{.m_width = m_shadowMapSize,
+                                    .m_height = m_shadowMapSize,
+                                    .m_usageFlags = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+                                    .m_aspectFlags = vk::ImageAspectFlagBits::eDepth,
+                                    .m_format = findDepthFormat()};
+
+    for(int i = 0; i < m_imageCount; ++i)
+    {
+        m_renderTargets[RenderPassStage::ShadowMap].push_back(
+            std::move(std::make_unique<Texture>(m_device, m_commandBuffer, std::move(params))));
+    }
+}
+
+void SwapChain::createShadowMapRenderPass()
+{
+    vk::AttachmentDescription depthAttachment{.format = findDepthFormat(),
+                                              .samples = vk::SampleCountFlagBits::e1,
+                                              .loadOp = vk::AttachmentLoadOp::eClear,
+                                              .storeOp = vk::AttachmentStoreOp::eStore,
+                                              .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+                                              .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+                                              .initialLayout = vk::ImageLayout::eUndefined,
+                                              .finalLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal};
+
+    vk::AttachmentReference depthAttachmentRef{.attachment = 0, .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal};
+
+    vk::SubpassDescription subpass{
+        .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
+        .colorAttachmentCount = 0,
+        .pDepthStencilAttachment = &depthAttachmentRef,
+    };
+
+    std::array<vk::SubpassDependency, 2> dependencies{};
+
+    dependencies[0] = {
+        .srcSubpass = vk::SubpassExternal,
+        .dstSubpass = 0,
+        .srcStageMask = vk::PipelineStageFlagBits::eFragmentShader,
+        .dstStageMask = vk::PipelineStageFlagBits::eEarlyFragmentTests,
+        .srcAccessMask = vk::AccessFlagBits::eShaderRead,
+        .dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+        .dependencyFlags = vk::DependencyFlagBits::eByRegion,
+    };
+
+    dependencies[1] = {
+        .srcSubpass = 0,
+        .dstSubpass = vk::SubpassExternal,
+        .srcStageMask = vk::PipelineStageFlagBits::eLateFragmentTests,
+        .dstStageMask = vk::PipelineStageFlagBits::eFragmentShader,
+        .srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+        .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+        .dependencyFlags = vk::DependencyFlagBits::eByRegion,
+    };
+
+    vk::RenderPassCreateInfo renderPassInfo{.attachmentCount = 1,
+                                            .pAttachments = &depthAttachment,
+                                            .subpassCount = 1,
+                                            .pSubpasses = &subpass,
+                                            .dependencyCount = static_cast<uint32_t>(dependencies.size()),
+                                            .pDependencies = dependencies.data()};
+
+    if(m_device->GetDevice().createRenderPass(&renderPassInfo, nullptr, &m_renderPasses[RenderPassStage::ShadowMap]) !=
+       vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create render pass!");
+    }
+}
+
+void SwapChain::createShadowMapFrameBuffers()
+{
+    m_framebuffers[RenderPassStage::ShadowMap].resize(m_imageCount);
+
+    for(int i = 0; i < 1; ++i)
+    {
+        vk::FramebufferCreateInfo frameBufferInfo{.renderPass = m_renderPasses[RenderPassStage::ShadowMap],
+                                                  .attachmentCount = 1,
+                                                  .pAttachments =
+                                                      m_renderTargets.at(RenderPassStage::ShadowMap).at(i)->GetImageView_ptr(),
+                                                  .width = m_shadowMapSize,
+                                                  .height = m_shadowMapSize,
+                                                  .layers = 1}; //if cube then 6
+
+        if(m_device->GetDevice().createFramebuffer(&frameBufferInfo, nullptr, &m_framebuffers[RenderPassStage::ShadowMap][i]) !=
+           vk::Result::eSuccess)
+        {
+            throw std::runtime_error("Failed to create framebuffer!");
+        }
+    }
 }
 
 vk::Format
@@ -298,14 +422,17 @@ void SwapChain::cleanupSwapChain()
     m_device->GetDevice().destroyImageView(m_depthImageView, nullptr);
     m_device->destroyImage(m_depthImage, m_depthImageAllocation);
 
-    for(auto framebuffer : m_swapChainFramebuffers)
+    for(auto& [_, framebuffers] : m_framebuffers)
     {
-        m_device->GetDevice().destroyFramebuffer(framebuffer, nullptr);
+        for(auto& framebuffer : framebuffers)
+        {
+            m_device->GetDevice().destroyFramebuffer(framebuffer, nullptr);
+        }
     }
 
-    for(auto imageView : m_swapChainImageViews)
+    for(auto& view : m_presentImageViews)
     {
-        m_device->GetDevice().destroyImageView(imageView, nullptr);
+        m_device->GetDevice().destroyImageView(view, nullptr);
     }
 
     m_device->GetDevice().destroySwapchainKHR(m_swapChain, nullptr);

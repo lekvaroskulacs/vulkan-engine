@@ -16,7 +16,7 @@ dbg: src/main.cpp
 	./compile_shaders.sh
 	./src/clang_format.sh
 	mkdir -p build
-	g++ $(CFLAGS) -ggdb -o build/engine ./src/source/*.cpp ./src/*.cpp $(IMGUI) $(LDFLAGS) -I./src/include/ $(INCLUDES) $(DEFINES)
+	g++ $(CFLAGS) -ggdb -o build/engine ./src/source/*.cpp ./src/*.cpp ./src/include/*.h $(IMGUI) $(LDFLAGS) -I./src/include/ $(INCLUDES) $(DEFINES)
 
 
 .PHONY: run clean

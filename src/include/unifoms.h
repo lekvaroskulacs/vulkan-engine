@@ -19,14 +19,14 @@ public:
         }
     }
 
-    virtual vk::DeviceSize getBufferSize()
+    vk::DeviceSize getBufferSize()
     {
         return m_bufferSize;
     }
 
     void updateBuffer(void* data, int currentImage)
     {
-        m_device->copyMemoryToAllocation(data, m_uniformBuffersAllocations[currentImage], getBufferSize());
+        m_device->copyMemoryToAllocation(data, m_uniformBuffersAllocations[currentImage], m_bufferSize);
     }
 
     std::vector<vk::Buffer> m_uniformBuffers;
@@ -61,7 +61,6 @@ public:
         alignas(16) glm::mat4 model;
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
-        alignas(16) glm::mat4 rayDir;
     };
 
     explicit UniformGameObject(std::shared_ptr<Device> device)
@@ -77,6 +76,7 @@ public:
     struct UniformBufferObject
     {
         alignas(16) glm::mat4 rayDir;
+        alignas(16) glm::vec4 position;
     };
 
     explicit UniformCamera(std::shared_ptr<Device> device)
@@ -91,8 +91,9 @@ class UniformLight : public Uniform
 public:
     struct UniformBufferObject
     {
-        alignas(4) glm::vec4 position;
-        alignas(4) glm::vec4 powerDensity;
+        alignas(16) glm::vec4 position;
+        alignas(16) glm::vec4 powerDensity;
+        alignas(16) glm::mat4 shadowViewProj;
     };
 
     explicit UniformLight(std::shared_ptr<Device> device)

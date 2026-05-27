@@ -12,6 +12,9 @@ namespace engine
 class Camera
 {
 public:
+    constexpr static float zNear = 0.1f;
+    constexpr static float zFar = 100.0f;
+
     Camera(GLFWwindow* window, std::shared_ptr<SwapChain> swapChain)
         : m_swapChain{swapChain}
     {
@@ -20,7 +23,7 @@ public:
 
         m_view = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
         m_proj = glm::perspective(
-            glm::radians(45.0f), m_swapChain->GetExtent().width / (float)m_swapChain->GetExtent().height, 0.1f, 1000.0f);
+            glm::radians(45.0f), m_swapChain->GetExtent().width / (float)m_swapChain->GetExtent().height, zNear, zFar);
         m_proj[1][1] *= -1;
     }
 
@@ -28,13 +31,13 @@ public:
     {
         float cameraSpeed = 0.0005f;
         if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            m_cameraPos += cameraSpeed * glm::normalize(m_cameraFront - m_cameraPos);
+            m_cameraPos += cameraSpeed * glm::normalize(m_cameraFront);
         if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            m_cameraPos -= cameraSpeed * glm::normalize(m_cameraFront - m_cameraPos);
+            m_cameraPos -= cameraSpeed * glm::normalize(m_cameraFront);
         if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            m_cameraPos -= glm::normalize(glm::cross(m_cameraFront - m_cameraPos, m_cameraUp)) * cameraSpeed;
+            m_cameraPos -= glm::normalize(glm::cross(m_cameraFront, m_cameraUp)) * cameraSpeed;
         if(glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            m_cameraPos += glm::normalize(glm::cross(m_cameraFront - m_cameraPos, m_cameraUp)) * cameraSpeed;
+            m_cameraPos += glm::normalize(glm::cross(m_cameraFront, m_cameraUp)) * cameraSpeed;
         if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
             m_cameraPos.y -= cameraSpeed;
         if(glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
@@ -42,7 +45,7 @@ public:
 
         m_view = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
         m_proj = glm::perspective(
-            glm::radians(45.0f), m_swapChain->GetExtent().width / (float)m_swapChain->GetExtent().height, 0.1f, 1000.0f);
+            glm::radians(45.0f), m_swapChain->GetExtent().width / (float)m_swapChain->GetExtent().height, zNear, zFar);
         m_proj[1][1] *= -1;
     }
 

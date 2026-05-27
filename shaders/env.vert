@@ -10,6 +10,7 @@ layout(location = 2) out vec3 sampleDir;
 
 layout(binding = 0) uniform UniformBufferObject {
     mat4 rayDir;
+    vec4 position;
 } ubo;
 
 void main() {

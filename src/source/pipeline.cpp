@@ -35,7 +35,17 @@ Pipeline::Pipeline(std::shared_ptr<Device> device, std::shared_ptr<SwapChain> sw
     , m_recreationParams(params.m_shaderPaths)
 {
     createDescriptorSetLayout(params.m_resources);
-    createGraphicsPipeline(params.m_shaderPaths);
+    if(!params.m_isShadowStage)
+    {
+        createGraphicsPipeline(params.m_shaderPaths);
+        m_recreatePipeline = [this](const ShaderCodePaths& params) { this->createGraphicsPipeline(params); };
+    }
+    else
+    {
+        m_shadowMap = true;
+        createShadowPipeline(params.m_shaderPaths);
+        m_recreatePipeline = [this](const ShaderCodePaths& params) { this->createShadowPipeline(params); };
+    }
     createDescriptorPool(params.m_resources);
     createDescriptorSets(params.m_resources);
 }
@@ -53,7 +63,7 @@ void Pipeline::recreatePipeline()
     m_device->GetDevice().waitIdle();
     m_device->GetDevice().destroyPipeline(m_graphicsPipeline, nullptr);
     m_device->GetDevice().destroyPipelineLayout(m_pipelineLayout, nullptr);
-    createGraphicsPipeline(m_recreationParams);
+    m_recreatePipeline(m_recreationParams);
 }
 
 void Pipeline::createDescriptorSetLayout(const std::unordered_map<uint8_t, PipelineResource>& resources)
@@ -250,7 +260,7 @@ void Pipeline::createGraphicsPipeline(const ShaderCodePaths& params)
         .pColorBlendState = &colorBlending,
         .pDynamicState = &dynamicState,
         .layout = m_pipelineLayout,
-        .renderPass = m_swapChain->GetRenderPass(),
+        .renderPass = m_swapChain->GetRenderPass(RenderPassStage::General),
         .subpass = 0,
         .basePipelineHandle = VK_NULL_HANDLE,
         .basePipelineIndex = -1,
@@ -263,6 +273,128 @@ void Pipeline::createGraphicsPipeline(const ShaderCodePaths& params)
 
     m_device->GetDevice().destroyShaderModule(vertShaderModule, nullptr);
     m_device->GetDevice().destroyShaderModule(fragShaderModule, nullptr);
+}
+
+void Pipeline::createShadowPipeline(const ShaderCodePaths& params)
+{
+    auto vertShaderCode = engine::utils::readFileAsString(params.m_vertexShaderPath);
+
+    vk::ShaderModule vertShaderModule =
+        createShaderModule(vertShaderCode, shaderc_shader_kind::shaderc_vertex_shader, params.m_vertexShaderPath);
+
+    vk::PipelineShaderStageCreateInfo vertShaderStageInfo{
+        .stage = vk::ShaderStageFlagBits::eVertex, .module = vertShaderModule, .pName = "main"};
+
+    vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo};
+
+    std::vector<vk::DynamicState> dynamicStates = {
+        vk::DynamicState::eViewport, vk::DynamicState::eScissor, vk::DynamicState::eDepthBias};
+    vk::PipelineDynamicStateCreateInfo dynamicState{.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
+                                                    .pDynamicStates = dynamicStates.data()};
+
+    auto bindingDesc = Vertex::getBindingDescription();
+    auto attribDesc = Vertex::getAttributeDescriptions();
+
+    vk::PipelineVertexInputStateCreateInfo vertexInputInfo{.vertexBindingDescriptionCount = 1,
+                                                           .pVertexBindingDescriptions = &bindingDesc,
+                                                           .vertexAttributeDescriptionCount = static_cast<uint32_t>(attribDesc.size()),
+                                                           .pVertexAttributeDescriptions = attribDesc.data()};
+
+    vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = vk::PrimitiveTopology::eTriangleList,
+                                                           .primitiveRestartEnable = vk::False};
+
+    vk::Viewport viewport{
+        .x = 0.0f,
+        .y = 0.0f,
+        .width = (float)m_swapChain->GetExtent().width,
+        .height = (float)m_swapChain->GetExtent().height,
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f,
+    };
+
+    vk::Rect2D scissor{.offset = {0, 0}, .extent = m_swapChain->GetExtent()};
+
+    vk::PipelineViewportStateCreateInfo viewportState{
+        .viewportCount = 1,
+        .scissorCount = 1,
+    };
+
+    vk::PipelineRasterizationStateCreateInfo rasterizer{
+        .depthClampEnable = vk::False,
+        .rasterizerDiscardEnable = vk::False,
+        .polygonMode = vk::PolygonMode::eFill,
+        .cullMode = vk::CullModeFlagBits::eNone,
+        .frontFace = vk::FrontFace::eCounterClockwise,
+        .depthBiasEnable = vk::True,
+        .depthBiasConstantFactor = 0.0f,
+        .depthBiasClamp = 0.0f,
+        .depthBiasSlopeFactor = 0.0f,
+        .lineWidth = 1.0f,
+    };
+
+    vk::PipelineMultisampleStateCreateInfo multisampling{
+        .rasterizationSamples = vk::SampleCountFlagBits::e1,
+        .sampleShadingEnable = vk::False,
+        .minSampleShading = 1.0f,
+        .pSampleMask = nullptr,
+        .alphaToCoverageEnable = vk::False,
+        .alphaToOneEnable = vk::False,
+    };
+
+    vk::PipelineColorBlendStateCreateInfo colorBlending{
+        .logicOpEnable = vk::False,
+        .logicOp = vk::LogicOp::eCopy,
+        .attachmentCount = 0,
+    };
+
+    vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+        .setLayoutCount = 1,
+        .pSetLayouts = &m_descriptorSetLayout,
+        .pushConstantRangeCount = 0,
+        .pPushConstantRanges = nullptr,
+    };
+
+    if(m_device->GetDevice().createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_pipelineLayout) != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create pipeline layout!");
+    }
+
+    vk::PipelineDepthStencilStateCreateInfo depthStencil{
+        .depthTestEnable = vk::True,
+        .depthWriteEnable = vk::True,
+        .depthCompareOp = vk::CompareOp::eLess,
+        .depthBoundsTestEnable = vk::False,
+        .stencilTestEnable = vk::False,
+        .front = {},
+        .back = {},
+        .minDepthBounds = 0.0f,
+        .maxDepthBounds = 1.0f,
+    };
+
+    vk::GraphicsPipelineCreateInfo pipelineInfo{
+        .stageCount = 1,
+        .pStages = shaderStages,
+        .pVertexInputState = &vertexInputInfo,
+        .pInputAssemblyState = &inputAssembly,
+        .pViewportState = &viewportState,
+        .pRasterizationState = &rasterizer,
+        .pMultisampleState = &multisampling,
+        .pDepthStencilState = &depthStencil,
+        .pColorBlendState = &colorBlending,
+        .pDynamicState = &dynamicState,
+        .layout = m_pipelineLayout,
+        .renderPass = m_swapChain->GetRenderPass(RenderPassStage::ShadowMap),
+        .subpass = 0,
+        .basePipelineHandle = VK_NULL_HANDLE,
+        .basePipelineIndex = -1,
+    };
+
+    if(m_device->GetDevice().createGraphicsPipelines({}, 1, &pipelineInfo, nullptr, &m_graphicsPipeline) != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("failed to create graphics pipeline!");
+    }
+
+    m_device->GetDevice().destroyShaderModule(vertShaderModule, nullptr);
 }
 
 void Pipeline::createDescriptorPool(const std::unordered_map<uint8_t, PipelineResource>& resources)
@@ -281,11 +413,16 @@ void Pipeline::createDescriptorPool(const std::unordered_map<uint8_t, PipelineRe
         }
     }
 
-    std::array<vk::DescriptorPoolSize, 2> poolSizes{};
-    poolSizes[0].type = vk::DescriptorType::eUniformBuffer;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * uniformCount);
-    poolSizes[1].type = vk::DescriptorType::eCombinedImageSampler;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * textureCount);
+    std::vector<vk::DescriptorPoolSize> poolSizes{};
+
+    if(uniformCount > 0)
+    {
+        poolSizes.push_back({vk::DescriptorType::eUniformBuffer, MAX_FRAMES_IN_FLIGHT * uniformCount});
+    }
+    if(textureCount > 0)
+    {
+        poolSizes.push_back({vk::DescriptorType::eCombinedImageSampler, MAX_FRAMES_IN_FLIGHT * textureCount});
+    }
 
     vk::DescriptorPoolCreateInfo poolInfo{
         .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
@@ -320,6 +457,11 @@ void Pipeline::createDescriptorSets(const std::unordered_map<uint8_t, PipelineRe
         descriptorWrites.resize(resources.size());
         int writesPos = 0;
 
+        std::vector<vk::DescriptorBufferInfo> bufferInfos;
+        std::vector<vk::DescriptorImageInfo> imageInfos;
+        bufferInfos.reserve(resources.size());
+        imageInfos.reserve(resources.size());
+
         for(auto& [binding, resource] : resources)
         {
             descriptorWrites[writesPos].sType = vk::StructureType::eWriteDescriptorSet;
@@ -331,26 +473,31 @@ void Pipeline::createDescriptorSets(const std::unordered_map<uint8_t, PipelineRe
             if(std::holds_alternative<Uniform*>(resource.m_resource))
             {
                 auto& uniform = std::get<Uniform*>(resource.m_resource);
-                vk::DescriptorBufferInfo bufferInfo{
+                bufferInfos.push_back({
                     .buffer = uniform->m_uniformBuffers[i],
                     .offset = 0,
-                    .range = uniform->getBufferSize(), //TODO : query uniform object type from resource
-                };
+                    .range = uniform->getBufferSize(),
+                });
 
                 descriptorWrites[writesPos].descriptorType = vk::DescriptorType::eUniformBuffer;
-                descriptorWrites[writesPos].pBufferInfo = &bufferInfo;
+                descriptorWrites[writesPos].pBufferInfo = &bufferInfos.back();
             }
             else if(std::holds_alternative<Texture*>(resource.m_resource))
             {
                 auto& texture = std::get<Texture*>(resource.m_resource);
-                vk::DescriptorImageInfo imageInfo{
+                auto flags = texture->GetAspectFlags();
+
+                auto imageLayout = (flags & vk::ImageAspectFlagBits::eDepth) != vk::ImageAspectFlags{}
+                                       ? vk::ImageLayout::eDepthStencilReadOnlyOptimal
+                                       : vk::ImageLayout::eShaderReadOnlyOptimal;
+                imageInfos.push_back({
                     .sampler = texture->GetSampler(),
                     .imageView = texture->GetImageView(),
-                    .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-                };
+                    .imageLayout = imageLayout,
+                });
 
                 descriptorWrites[writesPos].descriptorType = vk::DescriptorType::eCombinedImageSampler;
-                descriptorWrites[writesPos].pImageInfo = &imageInfo;
+                descriptorWrites[writesPos].pImageInfo = &imageInfos.back();
             }
 
             writesPos++;
