@@ -53,6 +53,7 @@ private:
     vk::ShaderModule createShaderModule(const std::string& code, shaderc_shader_kind kind, const std::string& inputFile);
     void createGraphicsPipeline(const ShaderCodePaths& paths);
     void createShadowPipeline(const ShaderCodePaths& paths);
+    void createOmniShadowPipeline(const ShaderCodePaths& params);
 
     void createDescriptorPool(const std::unordered_map<uint8_t, PipelineResource>& resources);
     void createDescriptorSets(const std::unordered_map<uint8_t, PipelineResource>& resources);

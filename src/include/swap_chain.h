@@ -51,6 +51,10 @@ private:
     void createShadowMapRenderPass();
     void createShadowMapFrameBuffers();
 
+    void createOmniShadowMapRenderTargets();
+    void createOmniShadowMapRenderPass();
+    void createOmniShadowMapFrameBuffers();
+
     vk::Format findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
     vk::Format findDepthFormat();
     void cleanupSwapChain();
@@ -76,6 +80,8 @@ private:
     vk::Image m_depthImage;
     VmaAllocation m_depthImageAllocation;
     vk::ImageView m_depthImageView;
+
+    std::unique_ptr<Texture> m_shadowDepthStencil;
 
     std::unordered_map<RenderPassStage, vk::RenderPass> m_renderPasses;
 };

@@ -11,6 +11,9 @@
 namespace engine
 {
 
+class Texture;
+
+// TODO: inheritance instead of variant
 struct Texture2DParams
 {
     std::string m_filepath;
@@ -27,10 +30,24 @@ struct TextureFramebufferParams
     vk::ImageUsageFlags m_usageFlags;
     vk::ImageAspectFlags m_aspectFlags;
     vk::Format m_format;
+    uint32_t m_baseArrayLayer = 0;
     bool m_isCube = false;
 };
 
-using TextureParams = std::variant<Texture2DParams, TextureCubeParams, TextureFramebufferParams>;
+struct TextureDepthStencilParams
+{
+    uint32_t m_width, m_height;
+    vk::Format m_depthFormat;
+};
+
+struct TextureViewOnlyParams
+{
+    Texture* m_reference;
+    uint32_t m_baseArrayLayer = 0;
+};
+
+using TextureParams =
+    std::variant<Texture2DParams, TextureCubeParams, TextureFramebufferParams, TextureDepthStencilParams, TextureViewOnlyParams>;
 
 class Texture
 {
@@ -45,9 +62,15 @@ public:
         return &m_textureImageView;
     }
 
+    // TODO: throw errors if called with viewonly (inheritance makes this cleaner)
     vk::Sampler GetSampler() const
     {
         return m_textureSampler;
+    }
+
+    vk::Image GetImage() const
+    {
+        return m_textureImage;
     }
 
     vk::ImageAspectFlags GetAspectFlags() const
@@ -83,6 +106,43 @@ public:
             createTextureFramebufferImageView();
             createTextureShadowSampler();
         }
+        else if(std::holds_alternative<TextureDepthStencilParams>(params))
+        {
+            auto depth_params = std::get<TextureDepthStencilParams>(params);
+            m_device->createImage(depth_params.m_width,
+                                  depth_params.m_height,
+                                  depth_params.m_depthFormat,
+                                  vk::ImageTiling::eOptimal,
+                                  vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eTransferSrc,
+                                  vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                  m_textureImage,
+                                  m_textureImageAllocation);
+            m_textureImageView =
+                m_device->createImageView(m_textureImage, depth_params.m_depthFormat, vk::ImageAspectFlagBits::eDepth);
+        }
+        else if(auto* view_only_params = std::get_if<TextureViewOnlyParams>(&params))
+        {
+            vk::ImageSubresourceRange range{
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = view_only_params->m_baseArrayLayer,
+                .layerCount = 1,
+            };
+
+            vk::ImageViewCreateInfo info{
+                .image = view_only_params->m_reference->GetImage(),
+                .viewType = vk::ImageViewType::e2D,
+                .format = vk::Format::eR32Sfloat,
+                .components = {vk::ComponentSwizzle::eR},
+                .subresourceRange = range,
+            };
+
+            if(m_device->GetDevice().createImageView(&info, nullptr, &m_textureImageView) != vk::Result::eSuccess)
+            {
+                throw std::runtime_error("failed to create image view!");
+            }
+        }
     }
 
     ~Texture()
@@ -91,6 +151,14 @@ public:
         m_device->GetDevice().destroyImageView(m_textureImageView, nullptr);
 
         m_device->destroyImage(m_textureImage, m_textureImageAllocation);
+    }
+
+    void transitionImageLayout(vk::ImageLayout oldLayout,
+                               vk::ImageLayout newLayout,
+                               uint32_t barrierLayerCount = 1,
+                               vk::ImageAspectFlags aspectFlags = vk::ImageAspectFlagBits::eColor)
+    {
+        transitionImageLayout(m_textureImage, {}, oldLayout, newLayout, barrierLayerCount, aspectFlags);
     }
 
 private:
@@ -171,13 +239,17 @@ private:
         m_device->destroyBuffer(stagingBuffer, stagingBufferAllocation);
     }
 
-    void transitionImageLayout(
-        vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, uint32_t barrierLayerCount = 1)
+    void transitionImageLayout(vk::Image image,
+                               vk::Format format,
+                               vk::ImageLayout oldLayout,
+                               vk::ImageLayout newLayout,
+                               uint32_t barrierLayerCount = 1,
+                               vk::ImageAspectFlags aspectFlags = vk::ImageAspectFlagBits::eColor)
     {
         vk::CommandBuffer commandBuffer = m_commandBuffer->beginSingleTimeCommands();
 
         vk::ImageSubresourceRange subresourceRange{
-            .aspectMask = vk::ImageAspectFlagBits::eColor,
+            .aspectMask = aspectFlags,
             .baseMipLevel = 0,
             .levelCount = 1,
             .baseArrayLayer = 0,
@@ -210,6 +282,22 @@ private:
 
             sourceStage = vk::PipelineStageFlagBits::eTransfer;
             destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
+        }
+        else if(oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal)
+        {
+            barrier.srcAccessMask = {};
+            barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+            sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
+            destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
+        }
+        else if(oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eDepthAttachmentOptimal)
+        {
+            barrier.srcAccessMask = {};
+            barrier.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+
+            sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
+            destinationStage = vk::PipelineStageFlagBits::eAllCommands;
         }
         else
         {
@@ -332,7 +420,7 @@ private:
                 .aspectMask = vk::ImageAspectFlagBits::eColor,
                 .mipLevel = 0,
                 .baseArrayLayer = i,
-                .layerCount = 1,
+                .layerCount = layerCount,
             };
             vk::BufferImageCopy region{
                 .bufferOffset = 0,

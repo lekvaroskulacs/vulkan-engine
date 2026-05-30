@@ -97,8 +97,9 @@ public:
                     glm::perspective(glm::radians(90.0f), 1.0f, engine::Camera::zNear, engine::Camera::zFar);
 
                 glm::mat4 depthViewMatrix = glm::lookAt(glm::vec3(ubo.position), m_light_facing, glm::vec3(0, 1, 0));
-                depthProjectionMatrix[1][1] *= -1;
-                ubo.shadowViewProj = depthProjectionMatrix * depthViewMatrix;
+                //depthProjectionMatrix[1][1] *= -1;
+                ubo.shadowView = depthViewMatrix;
+                ubo.shadowProj = depthProjectionMatrix;
                 light->updateBuffer(&ubo, currentImage);
             }
         };
@@ -120,9 +121,10 @@ public:
         m_testInterior->addTexture(1, vk::ShaderStageFlagBits::eFragment, std::move(vikingTexParams));
         m_testInterior->addUniform<engine::UniformLight>(
             2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, lightBinding);
+        m_testInterior->addLight(&m_light_pos);
         m_testInterior->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraBinding);
         m_testInterior->finalizeGameObject(
-            m_swapChain, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/max_blinn.frag"}, true);
+            m_swapChain, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/omni_shadow.frag"}, true);
 
         auto fsquad = std::make_unique<engine::FullscreenQuadMesh>(m_device, m_commandBuffer);
         m_skybox = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, std::move(fsquad));

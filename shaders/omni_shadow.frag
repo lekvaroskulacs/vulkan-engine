@@ -19,7 +19,7 @@ layout(binding = 3) uniform Camera {
     vec4 position;
 } camera;
 
-layout(binding = 4) uniform sampler2D shadowMap;
+layout(binding = 4) uniform samplerCube shadowMap;
 
 const float pi = 3.1415;
 
@@ -87,22 +87,13 @@ void main() {
 
     vec3 radiance = shade(light.powerDensity.xyz / lightDiff2, normal, lightDir, viewDir);
 
-    vec4 lightSpacePos = light.shadowViewProj * worldPos;
-    vec3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
-    // We need xy to be in NDC, but z is already in [0, 1] range in vulkan
-    projCoords.xy = projCoords.xy * 0.5 + 0.5;
-    float closestDepth = texture(shadowMap, projCoords.xy).r;
-    float currentDepth = projCoords.z;
+    //vec4 lightSpacePos = light.shadowViewProj * worldPos;
+    float closestDepth = texture(shadowMap, x - light.position.xyz).r;
+    float currentDepth = sqrt(lightDiff2);
 
     float bias = max(0.005 * (1.0 - dot(normal, -lightDir)), 0.001);
 
-    if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
-        projCoords.y < 0.0 || projCoords.y > 1.0 ||
-        projCoords.z < 0.0 || projCoords.z > 1.0)
-    {
-        outColor = vec4(radiance, 1.0);
-    }
-    else if (currentDepth > closestDepth + bias)
+    if (currentDepth > closestDepth + bias)
     {
         float shadowFactor = 0.8;
         vec3 shadowColor = vec3(0.0, 0.0, 0.0);
@@ -114,6 +105,6 @@ void main() {
         outColor = vec4(radiance, 1.0);
     }
     
-    //outColor = vec4(vec3(linearizeDepth(currentDepth)), 1.0);
+    //outColor = vec4(vec3(closestDepth), 1.0);
 
 }

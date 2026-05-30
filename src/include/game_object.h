@@ -51,6 +51,11 @@ public:
         m_pipelineResources[binding] = {.m_stage = shaderStage, .m_resource = tex};
     }
 
+    void addLight(glm::vec3* position)
+    {
+        m_light_position = position;
+    }
+
     void finalizeGameObject(std::shared_ptr<SwapChain> swapChain, const ShaderCodePaths& shaders, bool useShadows = false)
     {
         auto shadowIdx = m_pipelineResources.size();
@@ -68,7 +73,8 @@ public:
         if(useShadows)
         {
             createParams.m_resources.erase(shadowIdx);
-            createParams.m_shaderPaths = {.m_vertexShaderPath = "shaders/shadow.vert"};
+            createParams.m_shaderPaths = {.m_vertexShaderPath = "shaders/shadow_omni.vert",
+                                          .m_fragmentShaderPath = "shaders/shadow_omni.frag"};
             createParams.m_isShadowStage = true;
             m_shadowPipeline = std::make_unique<Pipeline>(m_device, swapChain, createParams);
         }
@@ -92,7 +98,7 @@ public:
 
             std::unordered_map<RenderPassStage, engine::DrawFrameParams::PerRenderPassParams> passInfos = {
                 {RenderPassStage::General, passParam}, {RenderPassStage::ShadowMap, shadowpassParam}};
-            DrawFrameParams drawParams{.m_renderPassInfo = passInfos, .m_mesh = *m_mesh};
+            DrawFrameParams drawParams{.m_renderPassInfo = passInfos, .m_mesh = *m_mesh, .m_light_position = *m_light_position};
 
             return drawParams;
         }
@@ -119,6 +125,8 @@ public:
     }
 
 private:
+    glm::vec3* m_light_position;
+
     std::vector<std::unique_ptr<Uniform>> m_uniforms;
     std::vector<std::unique_ptr<Texture>> m_textures;
     std::unique_ptr<Mesh> m_mesh;

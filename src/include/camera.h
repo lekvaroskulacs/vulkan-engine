@@ -29,7 +29,7 @@ public:
 
     void processInput(GLFWwindow* window, float dt)
     {
-        float cameraSpeed = 0.0005f;
+        float cameraSpeed = 1.0f * dt;
         if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
             m_cameraPos += cameraSpeed * glm::normalize(m_cameraFront);
         if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -45,7 +45,7 @@ public:
 
         m_view = glm::lookAt(m_cameraPos, m_cameraPos + m_cameraFront, m_cameraUp);
         m_proj = glm::perspective(
-            glm::radians(45.0f), m_swapChain->GetExtent().width / (float)m_swapChain->GetExtent().height, zNear, zFar);
+            glm::radians(90.0f), m_swapChain->GetExtent().width / (float)m_swapChain->GetExtent().height, zNear, zFar);
         m_proj[1][1] *= -1;
     }
 
@@ -95,8 +95,8 @@ public:
 
     std::shared_ptr<SwapChain> m_swapChain;
 
-    glm::vec3 m_cameraPos = glm::vec3(2.0f, 0.0f, 2.0f);
-    glm::vec3 m_cameraFront = glm::normalize(glm::vec3(-1.0f, 0.0f, -1.0f));
+    glm::vec3 m_cameraPos = glm::vec3(-2.0f, 0.1f, 0.0f); //glm::vec3(2.0f, 0.0f, 2.0f);
+    glm::vec3 m_cameraFront = glm::normalize(glm::vec3(1.0f, 0.0f, 0.0f));
     glm::vec3 m_cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
     glm::mat4 m_view;

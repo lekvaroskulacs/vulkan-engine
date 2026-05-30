@@ -25,6 +25,7 @@ struct DrawFrameParams
 
     std::unordered_map<RenderPassStage, PerRenderPassParams> m_renderPassInfo;
     Mesh& m_mesh;
+    glm::vec3 m_light_position;
 };
 
 class Renderer
@@ -46,6 +47,7 @@ public:
 
 private:
     void createSyncObjects();
+    void updateShadowCubeFaces(uint32_t faceIndex, vk::CommandBuffer commandBuffer, const std::vector<DrawFrameParams>& params_list);
 
     std::shared_ptr<Device> m_device;
     std::shared_ptr<SwapChain> m_swapChain;

@@ -93,7 +93,8 @@ public:
     {
         alignas(16) glm::vec4 position;
         alignas(16) glm::vec4 powerDensity;
-        alignas(16) glm::mat4 shadowViewProj;
+        alignas(16) glm::mat4 shadowView;
+        alignas(16) glm::mat4 shadowProj;
     };
 
     explicit UniformLight(std::shared_ptr<Device> device)

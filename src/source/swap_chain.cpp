@@ -17,9 +17,12 @@ SwapChain::SwapChain(std::shared_ptr<Device> device, std::shared_ptr<CommandBuff
     createGeneralRenderPass();
     createDepthResources();
     createGeneralFrameBuffers();
-    createShadowMapRenderTargets();
-    createShadowMapRenderPass();
-    createShadowMapFrameBuffers();
+    // createShadowMapRenderTargets();
+    // createShadowMapRenderPass();
+    // createShadowMapFrameBuffers();
+    createOmniShadowMapRenderTargets();
+    createOmniShadowMapRenderPass();
+    createOmniShadowMapFrameBuffers();
 }
 
 SwapChain::~SwapChain()
@@ -81,9 +84,12 @@ void SwapChain::recreateSwapChain()
     createGeneralImageViews();
     createDepthResources();
     createGeneralFrameBuffers();
-    createShadowMapRenderTargets();
-    createShadowMapRenderPass();
-    createShadowMapFrameBuffers();
+    // createShadowMapRenderTargets();
+    // createShadowMapRenderPass();
+    // createShadowMapFrameBuffers();
+    createOmniShadowMapRenderTargets();
+    createOmniShadowMapRenderPass();
+    createOmniShadowMapFrameBuffers();
 }
 
 vk::SurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats)
@@ -99,15 +105,16 @@ vk::SurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<vk::Su
     return availableFormats[0];
 }
 
+// TODO: make vsync optional
 vk::PresentModeKHR SwapChain::chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes)
 {
-    for(const auto& availablePresentMode : availablePresentModes)
-    {
-        if(availablePresentMode == vk::PresentModeKHR::eMailbox)
-        {
-            return availablePresentMode;
-        }
-    }
+    // for(const auto& availablePresentMode : availablePresentModes)
+    // {
+    //     if(availablePresentMode == vk::PresentModeKHR::eMailbox)
+    //     {
+    //         return availablePresentMode;
+    //     }
+    // }
     return vk::PresentModeKHR::eFifo;
 }
 
@@ -294,6 +301,14 @@ void SwapChain::createDepthResources()
                           m_depthImage,
                           m_depthImageAllocation);
     m_depthImageView = m_device->createImageView(m_depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
+
+    m_shadowDepthStencil =
+        std::make_unique<Texture>(m_device,
+                                  m_commandBuffer,
+                                  std::move(TextureDepthStencilParams{
+                                      .m_width = m_shadowMapSize, .m_height = m_shadowMapSize, .m_depthFormat = findDepthFormat()}));
+    m_shadowDepthStencil->transitionImageLayout(
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentOptimal, 1, vk::ImageAspectFlagBits::eDepth);
 }
 
 void SwapChain::createShadowMapRenderTargets()
@@ -380,6 +395,102 @@ void SwapChain::createShadowMapFrameBuffers()
                                                   .width = m_shadowMapSize,
                                                   .height = m_shadowMapSize,
                                                   .layers = 1}; //if cube then 6
+
+        if(m_device->GetDevice().createFramebuffer(&frameBufferInfo, nullptr, &m_framebuffers[RenderPassStage::ShadowMap][i]) !=
+           vk::Result::eSuccess)
+        {
+            throw std::runtime_error("Failed to create framebuffer!");
+        }
+    }
+}
+
+void SwapChain::createOmniShadowMapRenderTargets()
+{
+    TextureFramebufferParams params{.m_width = m_shadowMapSize,
+                                    .m_height = m_shadowMapSize,
+                                    .m_usageFlags = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+                                    .m_aspectFlags = vk::ImageAspectFlagBits::eColor,
+                                    .m_format = vk::Format::eR32Sfloat,
+                                    .m_isCube = true};
+
+    for(int i = 0; i < 1; ++i)
+    {
+        auto tex = std::make_unique<Texture>(m_device, m_commandBuffer, std::move(params));
+        tex->transitionImageLayout(vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal, 6);
+        m_renderTargets[RenderPassStage::ShadowMap].push_back(std::move(tex));
+    }
+
+    //also have 6 image views for all cube faces
+    for(uint32_t i = 0; i < 6; ++i)
+    {
+        TextureViewOnlyParams face{.m_reference = m_renderTargets[RenderPassStage::ShadowMap].at(0).get(), .m_baseArrayLayer = i};
+
+        auto tex = std::make_unique<Texture>(m_device, m_commandBuffer, std::move(face));
+        m_renderTargets[RenderPassStage::ShadowMap].push_back(std::move(tex));
+    }
+}
+
+void SwapChain::createOmniShadowMapRenderPass()
+{
+    vk::AttachmentDescription colorAttachment{.format = vk::Format::eR32Sfloat,
+                                              .samples = vk::SampleCountFlagBits::e1,
+                                              .loadOp = vk::AttachmentLoadOp::eClear,
+                                              .storeOp = vk::AttachmentStoreOp::eStore,
+                                              .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+                                              .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+                                              .initialLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+                                              .finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
+
+    vk::AttachmentReference colorAttachmentRef{.attachment = 0, .layout = vk::ImageLayout::eColorAttachmentOptimal};
+
+    vk::AttachmentDescription depthAttachment{.format = findDepthFormat(),
+                                              .samples = vk::SampleCountFlagBits::e1,
+                                              .loadOp = vk::AttachmentLoadOp::eClear,
+                                              .storeOp = vk::AttachmentStoreOp::eStore,
+                                              .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+                                              .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+                                              .initialLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                                              .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal};
+
+    vk::AttachmentReference depthAttachmentRef{.attachment = 1, .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal};
+
+    vk::SubpassDescription subpass{
+        .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &colorAttachmentRef,
+        .pDepthStencilAttachment = &depthAttachmentRef,
+    };
+
+    std::array<vk::AttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
+    vk::RenderPassCreateInfo renderPassInfo{.attachmentCount = static_cast<uint32_t>(attachments.size()),
+                                            .pAttachments = attachments.data(),
+                                            .subpassCount = 1,
+                                            .pSubpasses = &subpass,
+                                            .dependencyCount = 0,
+                                            .pDependencies = nullptr};
+
+    if(m_device->GetDevice().createRenderPass(&renderPassInfo, nullptr, &m_renderPasses[RenderPassStage::ShadowMap]) !=
+       vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create render pass!");
+    }
+}
+
+void SwapChain::createOmniShadowMapFrameBuffers()
+{
+    m_framebuffers[RenderPassStage::ShadowMap].resize(6);
+
+    vk::ImageView attachments[2];
+    attachments[1] = m_shadowDepthStencil->GetImageView();
+    for(int i = 0; i < 6; ++i)
+    {
+        attachments[0] = m_renderTargets.at(RenderPassStage::ShadowMap).at(i + 1)->GetImageView();
+        vk::FramebufferCreateInfo frameBufferInfo{.renderPass = m_renderPasses[RenderPassStage::ShadowMap],
+                                                  .attachmentCount = 2,
+                                                  .pAttachments = attachments,
+                                                  .width = m_shadowMapSize,
+                                                  .height = m_shadowMapSize,
+                                                  .layers = 1};
 
         if(m_device->GetDevice().createFramebuffer(&frameBufferInfo, nullptr, &m_framebuffers[RenderPassStage::ShadowMap][i]) !=
            vk::Result::eSuccess)

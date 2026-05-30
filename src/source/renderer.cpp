@@ -43,6 +43,97 @@ void Renderer::framebufferResizeCallback(GLFWwindow* window, int width, int heig
     app->m_framebufferResized = true;
 }
 
+void Renderer::updateShadowCubeFaces(uint32_t faceIndex,
+                                     vk::CommandBuffer commandBuffer,
+                                     const std::vector<DrawFrameParams>& params_list)
+{
+    std::array<vk::ClearValue, 2> clearValues{};
+    clearValues[0].color = vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f});
+    clearValues[1].depthStencil = vk::ClearDepthStencilValue{1.0f, 0};
+    vk::Rect2D renderArea{
+        .offset = {0, 0},
+        .extent = {m_swapChain->m_shadowMapSize, m_swapChain->m_shadowMapSize},
+    };
+
+    vk::RenderPassBeginInfo renderPassInfo{
+        .renderPass = m_swapChain->GetRenderPass(RenderPassStage::ShadowMap),
+        .framebuffer = m_swapChain->GetFrameBuffers(RenderPassStage::ShadowMap)[faceIndex],
+        .renderArea = renderArea,
+        .clearValueCount = static_cast<uint32_t>(clearValues.size()),
+        .pClearValues = clearValues.data(),
+    };
+
+    auto lightPos = params_list[1].m_light_position;
+    glm::mat4 viewMatrix = glm::mat4(1.0f);
+    switch(faceIndex)
+    {
+    case 0: // POSITIVE_X
+        viewMatrix = glm::lookAt(lightPos, lightPos + glm::vec3(1, 0, 0), glm::vec3(0, -1, 0));
+        break;
+    case 1: // NEGATIVE_X
+        viewMatrix = glm::lookAt(lightPos, lightPos + glm::vec3(-1, 0, 0), glm::vec3(0, -1, 0));
+        break;
+    case 2: // POSITIVE_Y
+        viewMatrix = glm::lookAt(lightPos, lightPos + glm::vec3(0, 1, 0), glm::vec3(0, 0, 1));
+        break;
+    case 3: // NEGATIVE_Y
+        viewMatrix = glm::lookAt(lightPos, lightPos + glm::vec3(0, -1, 0), glm::vec3(0, 0, -1));
+        break;
+    case 4: // POSITIVE_Z
+        viewMatrix = glm::lookAt(lightPos, lightPos + glm::vec3(0, 0, 1), glm::vec3(0, -1, 0));
+        break;
+    case 5: // NEGATIVE_Z
+        viewMatrix = glm::lookAt(lightPos, lightPos + glm::vec3(0, 0, -1), glm::vec3(0, -1, 0));
+        break;
+    }
+
+    commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+
+    for(const auto& renderpassesParams : params_list)
+    {
+        if(renderpassesParams.m_renderPassInfo.find(RenderPassStage::ShadowMap) == renderpassesParams.m_renderPassInfo.end())
+        {
+            continue;
+        }
+
+        const auto& params = renderpassesParams.m_renderPassInfo.at(RenderPassStage::ShadowMap);
+
+        //viewMatrix = glm::translate(viewMatrix, renderpassesParams.m_light_position);
+        commandBuffer.pushConstants(
+            params.m_pipeline.GetLayout(), vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4), &viewMatrix);
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, params.m_pipeline.Get());
+        vk::Viewport viewport{
+            .x = 0.0f,
+            .y = 0.0f,
+            .width = static_cast<float>(m_swapChain->m_shadowMapSize),
+            .height = static_cast<float>(m_swapChain->m_shadowMapSize),
+            .minDepth = 0.0f,
+            .maxDepth = 1.0f,
+        };
+        commandBuffer.setViewport(0, 1, &viewport);
+        vk::Rect2D scissor{
+            .offset = {0, 0},
+            .extent = {m_swapChain->m_shadowMapSize, m_swapChain->m_shadowMapSize},
+        };
+        commandBuffer.setScissor(0, 1, &scissor);
+
+        vk::Buffer vertexBuffers[] = {renderpassesParams.m_mesh.GetVertexBuffer()};
+        vk::DeviceSize offsets[] = {0};
+        commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+        commandBuffer.bindIndexBuffer(renderpassesParams.m_mesh.GetIndexBuffer(), 0, vk::IndexType::eUint32);
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                         params.m_pipeline.GetLayout(),
+                                         0,
+                                         1,
+                                         &params.m_pipeline.GetDescriptorSets()[m_currentFrame],
+                                         0,
+                                         nullptr);
+        commandBuffer.drawIndexed(static_cast<uint32_t>(renderpassesParams.m_mesh.GetIndices().size()), 1, 0, 0, 0);
+    }
+
+    commandBuffer.endRenderPass();
+}
+
 void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer,
                                    uint32_t imageIndex,
                                    const std::vector<DrawFrameParams>& params_list)
@@ -57,67 +148,10 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer,
     }
 
     {
-        std::array<vk::ClearValue, 1> clearValues{};
-        //clearValues[0].color = vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f});
-        clearValues[0].depthStencil = vk::ClearDepthStencilValue{1.0f, 0};
-        vk::Rect2D renderArea{
-            .offset = {0, 0},
-            .extent = {m_swapChain->m_shadowMapSize, m_swapChain->m_shadowMapSize},
-        };
-
-        vk::RenderPassBeginInfo renderPassInfo{
-            .renderPass = m_swapChain->GetRenderPass(RenderPassStage::ShadowMap),
-            .framebuffer = m_swapChain->GetFrameBuffers(RenderPassStage::ShadowMap)[0],
-            .renderArea = renderArea,
-            .clearValueCount = static_cast<uint32_t>(clearValues.size()),
-            .pClearValues = clearValues.data(),
-        };
-        commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
-
-        for(const auto& renderpassesParams : params_list)
+        for(uint32_t face = 0; face < 6; face++)
         {
-            if(renderpassesParams.m_renderPassInfo.find(RenderPassStage::ShadowMap) == renderpassesParams.m_renderPassInfo.end())
-            {
-                continue;
-            }
-
-            const auto& params = renderpassesParams.m_renderPassInfo.at(RenderPassStage::ShadowMap);
-
-            commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, params.m_pipeline.Get());
-            vk::Viewport viewport{
-                .x = 0.0f,
-                .y = 0.0f,
-                .width = static_cast<float>(m_swapChain->m_shadowMapSize),
-                .height = static_cast<float>(m_swapChain->m_shadowMapSize),
-                .minDepth = 0.0f,
-                .maxDepth = 1.0f,
-            };
-            commandBuffer.setViewport(0, 1, &viewport);
-            vk::Rect2D scissor{
-                .offset = {0, 0},
-                .extent = {m_swapChain->m_shadowMapSize, m_swapChain->m_shadowMapSize},
-            };
-            commandBuffer.setScissor(0, 1, &scissor);
-
-            const float depthBiasConstant = 1.25f;
-            const float depthBiasSlope = 1.75f;
-            commandBuffer.setDepthBias(depthBiasConstant, 0.0, depthBiasSlope);
-
-            vk::Buffer vertexBuffers[] = {renderpassesParams.m_mesh.GetVertexBuffer()};
-            vk::DeviceSize offsets[] = {0};
-            commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
-            commandBuffer.bindIndexBuffer(renderpassesParams.m_mesh.GetIndexBuffer(), 0, vk::IndexType::eUint32);
-            commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                             params.m_pipeline.GetLayout(),
-                                             0,
-                                             1,
-                                             &params.m_pipeline.GetDescriptorSets()[m_currentFrame],
-                                             0,
-                                             nullptr);
-            commandBuffer.drawIndexed(static_cast<uint32_t>(renderpassesParams.m_mesh.GetIndices().size()), 1, 0, 0, 0);
+            updateShadowCubeFaces(face, commandBuffer, params_list);
         }
-
-        commandBuffer.endRenderPass();
     }
 
     // 2nd renderpass
