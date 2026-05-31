@@ -1,4 +1,7 @@
 #include "../include/swap_chain.h"
+#include "../texture/texture_depth_stencil.h"
+#include "../texture/texture_framebuffer.h"
+#include "../texture/texture_view_only.h"
 #include <algorithm>
 #include <array>
 #include <limits>
@@ -302,11 +305,11 @@ void SwapChain::createDepthResources()
                           m_depthImageAllocation);
     m_depthImageView = m_device->createImageView(m_depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
 
-    m_shadowDepthStencil =
-        std::make_unique<Texture>(m_device,
-                                  m_commandBuffer,
-                                  std::move(TextureDepthStencilParams{
-                                      .m_width = m_shadowMapSize, .m_height = m_shadowMapSize, .m_depthFormat = findDepthFormat()}));
+    m_shadowDepthStencil = std::make_unique<TextureDepthStencil>(
+        m_device,
+        m_commandBuffer,
+        std::move(
+            TextureDepthStencilParams{.m_width = m_shadowMapSize, .m_height = m_shadowMapSize, .m_depthFormat = findDepthFormat()}));
     m_shadowDepthStencil->transitionImageLayout(
         vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentOptimal, 1, vk::ImageAspectFlagBits::eDepth);
 }
@@ -323,7 +326,7 @@ void SwapChain::createShadowMapRenderTargets()
     for(int i = 0; i < m_imageCount; ++i)
     {
         m_renderTargets[RenderPassStage::ShadowMap].push_back(
-            std::move(std::make_unique<Texture>(m_device, m_commandBuffer, std::move(params))));
+            std::move(std::make_unique<TextureFramebuffer>(m_device, m_commandBuffer, std::move(params))));
     }
 }
 
@@ -415,7 +418,7 @@ void SwapChain::createOmniShadowMapRenderTargets()
 
     for(int i = 0; i < 1; ++i)
     {
-        auto tex = std::make_unique<Texture>(m_device, m_commandBuffer, std::move(params));
+        auto tex = std::make_unique<TextureFramebuffer>(m_device, m_commandBuffer, std::move(params));
         tex->transitionImageLayout(vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal, 6);
         m_renderTargets[RenderPassStage::ShadowMap].push_back(std::move(tex));
     }
@@ -425,7 +428,7 @@ void SwapChain::createOmniShadowMapRenderTargets()
     {
         TextureViewOnlyParams face{.m_reference = m_renderTargets[RenderPassStage::ShadowMap].at(0).get(), .m_baseArrayLayer = i};
 
-        auto tex = std::make_unique<Texture>(m_device, m_commandBuffer, std::move(face));
+        auto tex = std::make_unique<TextureViewOnly>(m_device, m_commandBuffer, std::move(face));
         m_renderTargets[RenderPassStage::ShadowMap].push_back(std::move(tex));
     }
 }

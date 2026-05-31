@@ -1,10 +1,10 @@
 #pragma once
 
+#include "../pipeline/pipeline.h"
 #include "device.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
-#include "pipeline.h"
 
 #include <vulkan/vulkan.hpp>
 

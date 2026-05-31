@@ -45,7 +45,7 @@ void Renderer::framebufferResizeCallback(GLFWwindow* window, int width, int heig
 
 void Renderer::updateShadowCubeFaces(uint32_t faceIndex,
                                      vk::CommandBuffer commandBuffer,
-                                     const std::vector<DrawFrameParams>& params_list)
+                                     const std::vector<DrawFrameData>& params_list)
 {
     std::array<vk::ClearValue, 2> clearValues{};
     clearValues[0].color = vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f});
@@ -134,9 +134,7 @@ void Renderer::updateShadowCubeFaces(uint32_t faceIndex,
     commandBuffer.endRenderPass();
 }
 
-void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer,
-                                   uint32_t imageIndex,
-                                   const std::vector<DrawFrameParams>& params_list)
+void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex, const std::vector<DrawFrameData>& params_list)
 {
     vk::CommandBufferBeginInfo beginInfo{
         .flags = {},
@@ -216,7 +214,7 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer,
     commandBuffer.end();
 }
 
-void Renderer::drawFrame(const std::vector<DrawFrameParams>& params_list)
+void Renderer::drawFrame(const std::vector<DrawFrameData>& params_list)
 {
     [[maybe_unused]] auto ignored = m_device->GetDevice().waitForFences(1, &m_inFlightFences[m_currentFrame], vk::True, UINT64_MAX);
     uint32_t imageIndex;
@@ -278,7 +276,7 @@ void Renderer::drawFrame(const std::vector<DrawFrameParams>& params_list)
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void Renderer::updateUniformBuffers(uint32_t currentImage, const DrawFrameParams& params_list)
+void Renderer::updateUniformBuffers(uint32_t currentImage, const DrawFrameData& params_list)
 {
     for(auto& [_, perPass] : params_list.m_renderPassInfo)
     {

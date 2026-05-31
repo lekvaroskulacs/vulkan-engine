@@ -1,16 +1,16 @@
 #pragma once
 
+#include "../pipeline/pipeline.h"
 #include "camera.h"
 #include "command_buffer.h"
 #include "mesh.h"
-#include "pipeline.h"
 #include "user_interface.h"
 
 namespace engine
 {
 
 /// Data per draw call
-struct DrawFrameParams
+struct DrawFrameData
 {
     struct PerRenderPassParams
     {
@@ -40,14 +40,14 @@ public:
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 
-    void recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex, const std::vector<DrawFrameParams>& params_list);
+    void recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex, const std::vector<DrawFrameData>& params_list);
 
-    void drawFrame(const std::vector<DrawFrameParams>& params_list);
-    void updateUniformBuffers(uint32_t currentImage, const DrawFrameParams& params_list);
+    void drawFrame(const std::vector<DrawFrameData>& params_list);
+    void updateUniformBuffers(uint32_t currentImage, const DrawFrameData& params_list);
 
 private:
     void createSyncObjects();
-    void updateShadowCubeFaces(uint32_t faceIndex, vk::CommandBuffer commandBuffer, const std::vector<DrawFrameParams>& params_list);
+    void updateShadowCubeFaces(uint32_t faceIndex, vk::CommandBuffer commandBuffer, const std::vector<DrawFrameData>& params_list);
 
     std::shared_ptr<Device> m_device;
     std::shared_ptr<SwapChain> m_swapChain;

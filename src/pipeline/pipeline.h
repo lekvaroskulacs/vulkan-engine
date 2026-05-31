@@ -5,8 +5,8 @@
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
+#include "../texture/texture.h"
 #include "swap_chain.h"
-#include "texture.h"
 #include "unifoms.h"
 #include "utils.h"
 #include "vertex.h"
@@ -31,7 +31,6 @@ struct CreatePipelineParams
 {
     ShaderCodePaths m_shaderPaths;
     std::unordered_map<uint8_t, PipelineResource> m_resources;
-    bool m_isShadowStage = false;
 };
 
 class Pipeline
@@ -44,24 +43,19 @@ public:
     std::vector<vk::DescriptorSet> GetDescriptorSets() const;
 
     explicit Pipeline(std::shared_ptr<Device> device, std::shared_ptr<SwapChain> swapChain, const CreatePipelineParams& params);
-    ~Pipeline();
+    virtual ~Pipeline();
 
     void recreatePipeline();
 
-private:
+protected:
     void createDescriptorSetLayout(const std::unordered_map<uint8_t, PipelineResource>& resources);
     vk::ShaderModule createShaderModule(const std::string& code, shaderc_shader_kind kind, const std::string& inputFile);
-    void createGraphicsPipeline(const ShaderCodePaths& paths);
-    void createShadowPipeline(const ShaderCodePaths& paths);
-    void createOmniShadowPipeline(const ShaderCodePaths& params);
-
+    virtual void createPipeline(const ShaderCodePaths& paths) = 0;
     void createDescriptorPool(const std::unordered_map<uint8_t, PipelineResource>& resources);
     void createDescriptorSets(const std::unordered_map<uint8_t, PipelineResource>& resources);
 
     // Cached for recreation
     ShaderCodePaths m_recreationParams;
-    std::function<void(const ShaderCodePaths&)> m_recreatePipeline;
-    bool m_shadowMap = false;
 
     vk::DescriptorPool m_descriptorPool;
     std::vector<vk::DescriptorSet> m_descriptorSets;

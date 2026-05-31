@@ -1,3 +1,5 @@
+#include "../pipeline/render_pipeline.h"
+#include "../pipeline/shadowmap_omni_pipeline.h"
 #include "renderer.h"
 
 namespace engine
@@ -38,9 +40,10 @@ public:
         m_updateFunctions.push_back(updateFuncion);
     }
 
-    void addTexture(uint8_t binding, vk::ShaderStageFlags shaderStage, TextureParams&& params)
+    template <class TextureType, class TextureParamsType>
+    void addTexture(uint8_t binding, vk::ShaderStageFlags shaderStage, TextureParamsType&& params)
     {
-        auto texture = std::make_unique<Texture>(m_device, m_commandBuffer, std::move(params));
+        auto texture = std::make_unique<TextureType>(m_device, m_commandBuffer, std::move(params));
         m_pipelineResources[binding] = {.m_stage = shaderStage, .m_resource = texture.get()};
         m_textures.push_back(std::move(texture));
     }
@@ -68,47 +71,46 @@ public:
         CreatePipelineParams createParams{};
         createParams.m_shaderPaths = shaders;
         createParams.m_resources = m_pipelineResources;
-        m_pipeline = std::make_unique<Pipeline>(m_device, swapChain, createParams);
+        m_pipeline = std::make_unique<PipelineRender>(m_device, swapChain, createParams);
 
         if(useShadows)
         {
             createParams.m_resources.erase(shadowIdx);
             createParams.m_shaderPaths = {.m_vertexShaderPath = "shaders/shadow_omni.vert",
                                           .m_fragmentShaderPath = "shaders/shadow_omni.frag"};
-            createParams.m_isShadowStage = true;
-            m_shadowPipeline = std::make_unique<Pipeline>(m_device, swapChain, createParams);
+            m_shadowPipeline = std::make_unique<PipelineShadowMapOmni>(m_device, swapChain, createParams);
         }
     }
 
-    DrawFrameParams getDrawFrameParams()
+    DrawFrameData getDrawFrameParams()
     {
-        std::vector<engine::DrawFrameParams::PerRenderPassParams::UniformParam> uniformParamList;
+        std::vector<engine::DrawFrameData::PerRenderPassParams::UniformParam> uniformParamList;
         for(int i = 0; i < m_uniforms.size(); ++i)
         {
-            engine::DrawFrameParams::PerRenderPassParams::UniformParam uniformParam{.m_uniform = *m_uniforms[i],
-                                                                                    .m_operation = m_updateFunctions[i]};
+            engine::DrawFrameData::PerRenderPassParams::UniformParam uniformParam{.m_uniform = *m_uniforms[i],
+                                                                                  .m_operation = m_updateFunctions[i]};
             uniformParamList.push_back(std::move(uniformParam));
         }
 
         if(m_shadowPipeline)
         {
-            engine::DrawFrameParams::PerRenderPassParams passParam{.m_uniforms = uniformParamList, .m_pipeline = *m_pipeline};
-            engine::DrawFrameParams::PerRenderPassParams shadowpassParam{.m_uniforms = uniformParamList,
-                                                                         .m_pipeline = *m_shadowPipeline};
+            engine::DrawFrameData::PerRenderPassParams passParam{.m_uniforms = uniformParamList, .m_pipeline = *m_pipeline};
+            engine::DrawFrameData::PerRenderPassParams shadowpassParam{.m_uniforms = uniformParamList,
+                                                                       .m_pipeline = *m_shadowPipeline};
 
-            std::unordered_map<RenderPassStage, engine::DrawFrameParams::PerRenderPassParams> passInfos = {
+            std::unordered_map<RenderPassStage, engine::DrawFrameData::PerRenderPassParams> passInfos = {
                 {RenderPassStage::General, passParam}, {RenderPassStage::ShadowMap, shadowpassParam}};
-            DrawFrameParams drawParams{.m_renderPassInfo = passInfos, .m_mesh = *m_mesh, .m_light_position = *m_light_position};
+            DrawFrameData drawParams{.m_renderPassInfo = passInfos, .m_mesh = *m_mesh, .m_light_position = *m_light_position};
 
             return drawParams;
         }
         else
         {
-            engine::DrawFrameParams::PerRenderPassParams passParam{.m_uniforms = uniformParamList, .m_pipeline = *m_pipeline};
+            engine::DrawFrameData::PerRenderPassParams passParam{.m_uniforms = uniformParamList, .m_pipeline = *m_pipeline};
 
-            std::unordered_map<RenderPassStage, engine::DrawFrameParams::PerRenderPassParams> passInfos = {
+            std::unordered_map<RenderPassStage, engine::DrawFrameData::PerRenderPassParams> passInfos = {
                 {RenderPassStage::General, passParam}};
-            DrawFrameParams drawParams{.m_renderPassInfo = passInfos, .m_mesh = *m_mesh};
+            DrawFrameData drawParams{.m_renderPassInfo = passInfos, .m_mesh = *m_mesh};
 
             return drawParams;
         }

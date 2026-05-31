@@ -37,12 +37,14 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include "include/device.h"
 #include "include/game_object.h"
 #include "include/mesh.h"
-#include "include/pipeline.h"
 #include "include/renderer.h"
 #include "include/swap_chain.h"
-#include "include/texture.h"
 #include "include/unifoms.h"
 #include "include/user_interface.h"
+#include "pipeline/pipeline.h"
+#include "texture/texture.h"
+#include "texture/texture_2d.h"
+#include "texture/texture_cube.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -118,7 +120,8 @@ public:
                     mvp->updateBuffer(&ubo, currentImage);
                 }
             });
-        m_testInterior->addTexture(1, vk::ShaderStageFlagBits::eFragment, std::move(vikingTexParams));
+        m_testInterior->addTexture<engine::Texture2D, engine::Texture2DParams>(
+            1, vk::ShaderStageFlagBits::eFragment, std::move(vikingTexParams));
         m_testInterior->addUniform<engine::UniformLight>(
             2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, lightBinding);
         m_testInterior->addLight(&m_light_pos);
@@ -129,9 +132,32 @@ public:
         auto fsquad = std::make_unique<engine::FullscreenQuadMesh>(m_device, m_commandBuffer);
         m_skybox = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, std::move(fsquad));
         m_skybox->addUniform<engine::UniformCamera>(0, vk::ShaderStageFlagBits::eVertex, cameraBinding);
-        m_skybox->addTexture(1, vk::ShaderStageFlagBits::eFragment, std::move(env_params));
+        m_skybox->addTexture<engine::TextureCube, engine::TextureCubeParams>(
+            1, vk::ShaderStageFlagBits::eFragment, std::move(env_params));
         m_skybox->finalizeGameObject(m_swapChain,
                                      {.m_vertexShaderPath = "shaders/env.vert", .m_fragmentShaderPath = "shaders/env.frag"});
+
+        m_skull = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, "models/skull.obj");
+        m_skull->addUniform<engine::UniformGameObject>(
+            0, vk::ShaderStageFlagBits::eVertex, [&](engine::Uniform& uniform, int currentImage) {
+                auto* mvp = dynamic_cast<engine::UniformGameObject*>(&uniform);
+                if(mvp)
+                {
+                    engine::UniformGameObject::UniformBufferObject ubo{};
+                    ubo.model = glm::rotate(glm::mat4(1.0f), -glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+                    ubo.model = glm::scale(ubo.model, glm::vec3{0.04f});
+                    ubo.view = m_camera->m_view;
+                    ubo.proj = m_camera->m_proj;
+                    mvp->updateBuffer(&ubo, currentImage);
+                }
+            });
+        m_skull->addTexture<engine::Texture2D, engine::Texture2DParams>(
+            1, vk::ShaderStageFlagBits::eFragment, std::move(engine::Texture2DParams{.m_filepath = "textures/Skull.jpg"}));
+        m_skull->addUniform<engine::UniformLight>(
+            2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, lightBinding);
+        m_skull->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraBinding);
+        m_skull->finalizeGameObject(
+            m_swapChain, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/textured_max_blinn.frag"});
 
         mainLoop();
     }
@@ -148,6 +174,7 @@ private:
 
     std::unique_ptr<engine::GameObject> m_testInterior;
     std::unique_ptr<engine::GameObject> m_skybox;
+    std::unique_ptr<engine::GameObject> m_skull;
 
     glm::vec3 m_light_pos = glm::vec3(-2.0f, 0.1f, 0.0f);
     glm::vec3 m_light_facing = glm::vec3(1.0f);
@@ -172,9 +199,10 @@ private:
             refs.m_light_facing = &m_light_facing;
             m_ui->buildInterface(refs);
 
-            std::vector<engine::DrawFrameParams> params_list;
+            std::vector<engine::DrawFrameData> params_list;
             params_list.push_back(m_skybox->getDrawFrameParams());
             params_list.push_back(m_testInterior->getDrawFrameParams());
+            params_list.push_back(m_skull->getDrawFrameParams());
             m_renderer->drawFrame(params_list);
         }
 
