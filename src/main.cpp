@@ -74,7 +74,7 @@ public:
                                                  "textures/skybox6.jpg",
                                              }};
 
-        auto cameraBinding = [&](engine::Uniform& uniform, int currentImage) {
+        auto cameraUpdate = [&](engine::Uniform& uniform, int currentImage) {
             auto* camera = dynamic_cast<engine::UniformCamera*>(&uniform);
             if(camera)
             {
@@ -125,13 +125,13 @@ public:
         m_testInterior->addUniform<engine::UniformLight>(
             2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, lightBinding);
         m_testInterior->addLight(&m_light_pos);
-        m_testInterior->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraBinding);
+        m_testInterior->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraUpdate);
         m_testInterior->finalizeGameObject(
             m_swapChain, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/omni_shadow.frag"}, true);
 
         auto fsquad = std::make_unique<engine::FullscreenQuadMesh>(m_device, m_commandBuffer);
         m_skybox = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, std::move(fsquad));
-        m_skybox->addUniform<engine::UniformCamera>(0, vk::ShaderStageFlagBits::eVertex, cameraBinding);
+        m_skybox->addUniform<engine::UniformCamera>(0, vk::ShaderStageFlagBits::eVertex, cameraUpdate);
         m_skybox->addTexture<engine::TextureCube, engine::TextureCubeParams>(
             1, vk::ShaderStageFlagBits::eFragment, std::move(env_params));
         m_skybox->finalizeGameObject(m_swapChain,
@@ -155,7 +155,7 @@ public:
             1, vk::ShaderStageFlagBits::eFragment, std::move(engine::Texture2DParams{.m_filepath = "textures/Skull.jpg"}));
         m_skull->addUniform<engine::UniformLight>(
             2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, lightBinding);
-        m_skull->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraBinding);
+        m_skull->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraUpdate);
         m_skull->finalizeGameObject(
             m_swapChain, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/textured_max_blinn.frag"});
 

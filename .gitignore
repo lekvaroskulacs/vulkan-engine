@@ -3,5 +3,6 @@
 build/
 shaders/bin
 imgui.ini
+build_cmake/
 # models/
 # textures/
