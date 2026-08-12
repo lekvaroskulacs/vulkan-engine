@@ -5,9 +5,9 @@
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
+#include "../renderpass/render_pass.h"
 #include "../texture/texture.h"
-#include "swap_chain.h"
-#include "unifoms.h"
+#include "uniforms.h"
 #include "utils.h"
 #include "vertex.h"
 
@@ -42,7 +42,7 @@ public:
     vk::DescriptorPool GetDescriptorPool() const;
     std::vector<vk::DescriptorSet> GetDescriptorSets() const;
 
-    explicit Pipeline(std::shared_ptr<Device> device, std::shared_ptr<SwapChain> swapChain, const CreatePipelineParams& params);
+    explicit Pipeline(std::shared_ptr<Device> device, std::shared_ptr<RenderPass> renderPass, const CreatePipelineParams& params);
     virtual ~Pipeline();
 
     void recreatePipeline();
@@ -61,7 +61,7 @@ protected:
     std::vector<vk::DescriptorSet> m_descriptorSets;
 
     std::shared_ptr<Device> m_device;
-    std::shared_ptr<SwapChain> m_swapChain;
+    std::shared_ptr<RenderPass> m_renderPass;
 
     vk::DescriptorSetLayout m_descriptorSetLayout;
     vk::PipelineLayout m_pipelineLayout;

@@ -30,9 +30,9 @@ std::vector<vk::DescriptorSet> Pipeline::GetDescriptorSets() const
     return m_descriptorSets;
 }
 
-Pipeline::Pipeline(std::shared_ptr<Device> device, std::shared_ptr<SwapChain> swapChain, const CreatePipelineParams& params)
+Pipeline::Pipeline(std::shared_ptr<Device> device, std::shared_ptr<RenderPass> renderPass, const CreatePipelineParams& params)
     : m_device(device)
-    , m_swapChain(swapChain)
+    , m_renderPass(renderPass)
     , m_recreationParams(params.m_shaderPaths)
 {
     createDescriptorSetLayout(params.m_resources);

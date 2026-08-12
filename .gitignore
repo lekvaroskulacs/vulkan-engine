@@ -4,5 +4,6 @@ build/
 shaders/bin
 imgui.ini
 build_cmake/
+vcpkg_installed/
 # models/
 # textures/

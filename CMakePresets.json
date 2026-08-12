@@ -10,7 +10,8 @@
             "name": "base",
             "hidden": true,
             "generator": "Unix Makefiles",
-            "binaryDir": "${sourceDir}/build_cmake/${presetName}"
+            "binaryDir": "${sourceDir}/build_cmake/${presetName}",
+            "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake"
         },
         {
             "name": "release",

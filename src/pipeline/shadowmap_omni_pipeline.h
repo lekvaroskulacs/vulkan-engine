@@ -9,7 +9,7 @@ class PipelineShadowMapOmni : public Pipeline
 {
 public:
     explicit PipelineShadowMapOmni(std::shared_ptr<Device> device,
-                                   std::shared_ptr<SwapChain> swapChain,
+                                   std::shared_ptr<RenderPass> renderPass,
                                    const CreatePipelineParams& params);
     virtual ~PipelineShadowMapOmni();
 

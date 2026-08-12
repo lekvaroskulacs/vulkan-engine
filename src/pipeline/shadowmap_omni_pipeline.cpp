@@ -4,9 +4,9 @@ namespace engine
 {
 
 PipelineShadowMapOmni::PipelineShadowMapOmni(std::shared_ptr<Device> device,
-                                             std::shared_ptr<SwapChain> swapChain,
+                                             std::shared_ptr<RenderPass> renderPass,
                                              const CreatePipelineParams& params)
-    : Pipeline(device, swapChain, params)
+    : Pipeline(device, renderPass, params)
 {
     createPipeline(params.m_shaderPaths);
 }
@@ -50,13 +50,13 @@ void PipelineShadowMapOmni::createPipeline(const ShaderCodePaths& paths)
     vk::Viewport viewport{
         .x = 0.0f,
         .y = 0.0f,
-        .width = (float)m_swapChain->GetExtent().width,
-        .height = (float)m_swapChain->GetExtent().height,
+        .width = (float)m_renderPass->GetExtent().width,
+        .height = (float)m_renderPass->GetExtent().height,
         .minDepth = 0.0f,
         .maxDepth = 1.0f,
     };
 
-    vk::Rect2D scissor{.offset = {0, 0}, .extent = m_swapChain->GetExtent()};
+    vk::Rect2D scissor{.offset = {0, 0}, .extent = m_renderPass->GetExtent()};
 
     vk::PipelineViewportStateCreateInfo viewportState{
         .viewportCount = 1,
@@ -149,7 +149,7 @@ void PipelineShadowMapOmni::createPipeline(const ShaderCodePaths& paths)
         .pColorBlendState = &colorBlending,
         .pDynamicState = &dynamicState,
         .layout = m_pipelineLayout,
-        .renderPass = m_swapChain->GetRenderPass(RenderPassStage::ShadowMap),
+        .renderPass = m_renderPass->Get(),
         .subpass = 0,
         .basePipelineHandle = VK_NULL_HANDLE,
         .basePipelineIndex = -1,

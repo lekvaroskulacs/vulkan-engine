@@ -82,6 +82,9 @@ public:
                      uint32_t arrayLayers = 1);
     void destroyImage(vk::Image& image, VmaAllocation& allocation);
 
+    vk::Format findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
+    vk::Format findDepthFormat();
+
 private:
     static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                                           vk::DebugUtilsMessageTypeFlagsEXT messageType,

@@ -1,9 +1,11 @@
 #pragma once
 
 #include "../pipeline/pipeline.h"
+#include "../renderpass/render_pass.h"
 #include "camera.h"
 #include "command_buffer.h"
 #include "mesh.h"
+#include "swap_chain.h"
 #include "user_interface.h"
 
 namespace engine
@@ -33,6 +35,7 @@ class Renderer
 public:
     explicit Renderer(std::shared_ptr<Device> device,
                       std::shared_ptr<SwapChain> swapChain,
+                      RenderPassList renderPasses,
                       std::shared_ptr<CommandBuffer> commandBuffers,
                       std::shared_ptr<Camera> camera,
                       std::shared_ptr<UserInterface> ui);
@@ -47,10 +50,11 @@ public:
 
 private:
     void createSyncObjects();
-    void updateShadowCubeFaces(uint32_t faceIndex, vk::CommandBuffer commandBuffer, const std::vector<DrawFrameData>& params_list);
+    void recreateSwapChainResources();
 
     std::shared_ptr<Device> m_device;
     std::shared_ptr<SwapChain> m_swapChain;
+    RenderPassList m_renderPasses;
     std::shared_ptr<CommandBuffer> m_commandBuffers;
     std::shared_ptr<Camera> m_camera;
     std::shared_ptr<UserInterface> m_ui;

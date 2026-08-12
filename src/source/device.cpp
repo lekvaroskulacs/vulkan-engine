@@ -163,6 +163,33 @@ void Device::destroyImage(vk::Image& image, VmaAllocation& allocation)
     vmaDestroyImage(m_allocator, image, allocation);
 }
 
+vk::Format Device::findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features)
+{
+    for(vk::Format format : candidates)
+    {
+        vk::FormatProperties props;
+        m_physicalDevice.getFormatProperties(format, &props);
+
+        if(tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)
+        {
+            return format;
+        }
+        else if(tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features)
+        {
+            return format;
+        }
+    }
+
+    throw std::runtime_error("failed to find supported format!");
+}
+
+vk::Format Device::findDepthFormat()
+{
+    return findSupportedFormat({vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
+                               vk::ImageTiling::eOptimal,
+                               vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+}
+
 VKAPI_ATTR vk::Bool32 VKAPI_CALL Device::debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                                        vk::DebugUtilsMessageTypeFlagsEXT messageType,
                                                        const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,

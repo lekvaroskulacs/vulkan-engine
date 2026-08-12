@@ -25,6 +25,7 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
+
 #include <vulkan/vulkan.hpp>
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #define STB_IMAGE_IMPLEMENTATION
@@ -39,9 +40,11 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include "include/mesh.h"
 #include "include/renderer.h"
 #include "include/swap_chain.h"
-#include "include/unifoms.h"
+#include "include/uniforms.h"
 #include "include/user_interface.h"
 #include "pipeline/pipeline.h"
+#include "renderpass/general_render_pass.h"
+#include "renderpass/shadowmap_omni_render_pass.h"
 #include "texture/texture.h"
 #include "texture/texture_2d.h"
 #include "texture/texture_cube.h"
@@ -53,15 +56,20 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 class EngineApplication
 {
 public:
-    void run()
+
+    void setupScene()
     {
         m_window = std::make_shared<engine::Window>();
         m_device = std::make_shared<engine::Device>(m_window);
         m_commandBuffer = std::make_shared<engine::CommandBuffer>(m_device);
         m_swapChain = std::make_shared<engine::SwapChain>(m_device, m_commandBuffer, m_window);
+        m_generalRenderPass = std::make_shared<engine::GeneralRenderPass>(m_device, m_swapChain);
+        m_shadowOmniRenderPass = std::make_shared<engine::OmniShadowMapRenderPass>(m_device, m_commandBuffer);
+        m_renderPasses = {{engine::RenderPassStage::ShadowMapOmni, m_shadowOmniRenderPass},
+                          {engine::RenderPassStage::General, m_generalRenderPass}};
         m_camera = std::make_shared<engine::Camera>(m_window->Get(), m_swapChain);
-        m_ui = std::make_shared<engine::UserInterface>(m_device, m_swapChain->GetRenderPass(engine::RenderPassStage::General));
-        m_renderer = std::make_shared<engine::Renderer>(m_device, m_swapChain, m_commandBuffer, m_camera, m_ui);
+        m_ui = std::make_shared<engine::UserInterface>(m_device, m_generalRenderPass->Get());
+        m_renderer = std::make_shared<engine::Renderer>(m_device, m_swapChain, m_renderPasses, m_commandBuffer, m_camera, m_ui);
         m_window->SetResizeCallback(engine::Renderer::framebufferResizeCallback);
 
         engine::Texture2DParams vikingTexParams{.m_filepath = "textures/viking_room.png"};
@@ -127,14 +135,14 @@ public:
         m_testInterior->addLight(&m_light_pos);
         m_testInterior->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraUpdate);
         m_testInterior->finalizeGameObject(
-            m_swapChain, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/omni_shadow.frag"}, true);
+            m_renderPasses, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/omni_shadow.frag"}, true);
 
         auto fsquad = std::make_unique<engine::FullscreenQuadMesh>(m_device, m_commandBuffer);
         m_skybox = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, std::move(fsquad));
         m_skybox->addUniform<engine::UniformCamera>(0, vk::ShaderStageFlagBits::eVertex, cameraUpdate);
         m_skybox->addTexture<engine::TextureCube, engine::TextureCubeParams>(
             1, vk::ShaderStageFlagBits::eFragment, std::move(env_params));
-        m_skybox->finalizeGameObject(m_swapChain,
+        m_skybox->finalizeGameObject(m_renderPasses,
                                      {.m_vertexShaderPath = "shaders/env.vert", .m_fragmentShaderPath = "shaders/env.frag"});
 
         m_skull = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, "models/skull.obj");
@@ -157,8 +165,13 @@ public:
             2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, lightBinding);
         m_skull->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraUpdate);
         m_skull->finalizeGameObject(
-            m_swapChain, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/textured_max_blinn.frag"});
+            m_renderPasses, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/textured_max_blinn.frag"});
 
+    }
+
+    void run()
+    {
+        setupScene();
         mainLoop();
     }
 
@@ -166,6 +179,9 @@ private:
     std::shared_ptr<engine::Window> m_window;
     std::shared_ptr<engine::Device> m_device;
     std::shared_ptr<engine::SwapChain> m_swapChain;
+    std::shared_ptr<engine::GeneralRenderPass> m_generalRenderPass;
+    std::shared_ptr<engine::OmniShadowMapRenderPass> m_shadowOmniRenderPass;
+    engine::RenderPassList m_renderPasses;
     std::shared_ptr<engine::CommandBuffer> m_commandBuffer;
     std::shared_ptr<engine::Renderer> m_renderer;
     std::shared_ptr<engine::UserInterface> m_ui;

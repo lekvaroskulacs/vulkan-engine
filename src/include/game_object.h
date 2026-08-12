@@ -59,26 +59,30 @@ public:
         m_light_position = position;
     }
 
-    void finalizeGameObject(std::shared_ptr<SwapChain> swapChain, const ShaderCodePaths& shaders, bool useShadows = false)
+    void finalizeGameObject(const RenderPassList& renderPasses, const ShaderCodePaths& shaders, bool useShadows = false)
     {
+        auto generalPass = findRenderPass(renderPasses, RenderPassStage::General);
+
         auto shadowIdx = m_pipelineResources.size();
         if(useShadows)
         {
-            m_pipelineResources[shadowIdx] = {.m_stage = vk::ShaderStageFlagBits::eFragment,
-                                              .m_resource = swapChain->GetRenderTarget(RenderPassStage::ShadowMap)};
+            m_pipelineResources[shadowIdx] = {
+                .m_stage = vk::ShaderStageFlagBits::eFragment,
+                .m_resource = findRenderPass(renderPasses, RenderPassStage::ShadowMapOmni)->GetRenderTarget()};
         }
 
         CreatePipelineParams createParams{};
         createParams.m_shaderPaths = shaders;
         createParams.m_resources = m_pipelineResources;
-        m_pipeline = std::make_unique<PipelineRender>(m_device, swapChain, createParams);
+        m_pipeline = std::make_unique<PipelineRender>(m_device, generalPass, createParams);
 
         if(useShadows)
         {
+            auto shadowPass = findRenderPass(renderPasses, RenderPassStage::ShadowMapOmni);
             createParams.m_resources.erase(shadowIdx);
             createParams.m_shaderPaths = {.m_vertexShaderPath = "shaders/shadow_omni.vert",
                                           .m_fragmentShaderPath = "shaders/shadow_omni.frag"};
-            m_shadowPipeline = std::make_unique<PipelineShadowMapOmni>(m_device, swapChain, createParams);
+            m_shadowPipeline = std::make_unique<PipelineShadowMapOmni>(m_device, shadowPass, createParams);
         }
     }
 
@@ -99,7 +103,7 @@ public:
                                                                        .m_pipeline = *m_shadowPipeline};
 
             std::unordered_map<RenderPassStage, engine::DrawFrameData::PerRenderPassParams> passInfos = {
-                {RenderPassStage::General, passParam}, {RenderPassStage::ShadowMap, shadowpassParam}};
+                {RenderPassStage::General, passParam}, {RenderPassStage::ShadowMapOmni, shadowpassParam}};
             DrawFrameData drawParams{.m_renderPassInfo = passInfos, .m_mesh = *m_mesh, .m_light_position = *m_light_position};
 
             return drawParams;

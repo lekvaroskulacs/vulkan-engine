@@ -14,12 +14,13 @@ find_package(Vulkan REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLFW REQUIRED IMPORTED_TARGET glfw3)
 
-find_library(SHADERC_SHARED_LIB shaderc_shared REQUIRED)
+find_package(unofficial-shaderc CONFIG REQUIRED)
 
 file(GLOB ENGINE_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/src/*.cpp
     ${CMAKE_SOURCE_DIR}/src/source/*.cpp
     ${CMAKE_SOURCE_DIR}/src/pipeline/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/renderpass/*.cpp
 )
 
 set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/thirdparty/imgui)
@@ -49,7 +50,7 @@ target_compile_definitions(engine PRIVATE
 target_link_libraries(engine PRIVATE
     Vulkan::Vulkan
     PkgConfig::GLFW
-    ${SHADERC_SHARED_LIB}
+    unofficial::shaderc::shaderc
     dl
     pthread
 )

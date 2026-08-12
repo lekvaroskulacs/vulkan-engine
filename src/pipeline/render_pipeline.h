@@ -8,7 +8,7 @@ namespace engine
 class PipelineRender : public Pipeline
 {
 public:
-    explicit PipelineRender(std::shared_ptr<Device> device, std::shared_ptr<SwapChain> swapChain, const CreatePipelineParams& params);
+    explicit PipelineRender(std::shared_ptr<Device> device, std::shared_ptr<RenderPass> renderPass, const CreatePipelineParams& params);
     virtual ~PipelineRender();
 
 private:
