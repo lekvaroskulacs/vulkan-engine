@@ -9,6 +9,8 @@ struct Light
     alignas(16) glm::vec4 colorIntensity;
 };
 
+// TODO: probably there should be an extra step in the hierarchy for StorageBuffer 
+// when needed and light should inherit that
 class LightBuffer : public ConcreteBuffer
 {
 public:

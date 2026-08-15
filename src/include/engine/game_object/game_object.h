@@ -36,6 +36,7 @@ public:
     {
         auto uniform = std::make_unique<UniformType>(m_device);
         m_pipelineResources[binding] = {.m_stage = shaderStage, .m_resource = uniform.get()};
+        m_updatables.push_back(uniform.get());
         m_uniforms.push_back(std::move(uniform));
         m_updateFunctions.push_back(updateFuncion);
     }
@@ -57,6 +58,13 @@ public:
     void setShadowLightPosition(glm::vec3* position)
     {
         m_shadow_light_position = position;
+    }
+
+    void addLights(uint8_t binding, LightBuffer* lights, std::function<void(UpdatableBuffer&, int)> updateFuncion)
+    {
+        m_pipelineResources[binding] = {.m_stage = vk::ShaderStageFlagBits::eAll, .m_resource = lights};
+        m_updatables.push_back(lights);
+        m_updateFunctions.push_back(updateFuncion);
     }
 
     void finalizeGameObject(const RenderPassList& renderPasses, const ShaderCodePaths& shaders, bool useShadows = false)
@@ -89,9 +97,9 @@ public:
     DrawFrameData getDrawFrameParams()
     {
         std::vector<engine::DrawFrameData::PerRenderPassParams::UniformParam> uniformParamList;
-        for(int i = 0; i < m_uniforms.size(); ++i)
+        for(int i = 0; i < m_updatables.size(); ++i)
         {
-            engine::DrawFrameData::PerRenderPassParams::UniformParam uniformParam{.m_uniform = *m_uniforms[i],
+            engine::DrawFrameData::PerRenderPassParams::UniformParam uniformParam{.m_uniform = *m_updatables[i],
                                                                                   .m_operation = m_updateFunctions[i]};
             uniformParamList.push_back(std::move(uniformParam));
         }
@@ -133,12 +141,15 @@ public:
 private:
     glm::vec3* m_shadow_light_position;
 
-    std::vector<std::unique_ptr<ConcreteBuffer>> m_uniforms;
+    std::vector<std::unique_ptr<Uniform>> m_uniforms;
     std::vector<std::unique_ptr<Texture>> m_textures;
     std::unique_ptr<Mesh> m_mesh;
     std::unique_ptr<Pipeline> m_pipeline;
     std::unique_ptr<Pipeline> m_shadowPipeline;
     std::unordered_map<uint8_t, engine::PipelineResource> m_pipelineResources;
+
+    // TODO: These elements have to be in corresponding order right now
+    std::vector<UpdatableBuffer*> m_updatables;
     std::vector<std::function<void(engine::UpdatableBuffer&, int)>> m_updateFunctions;
 
     std::shared_ptr<Device> m_device;

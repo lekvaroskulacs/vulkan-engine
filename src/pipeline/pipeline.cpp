@@ -1,4 +1,5 @@
 #include <engine/pipeline/pipeline.h>
+#include <engine/lights/lights.h>
 #include <stdexcept>
 
 namespace engine
@@ -61,7 +62,7 @@ void Pipeline::createDescriptorSetLayout(const std::unordered_map<uint8_t, Pipel
     std::vector<vk::DescriptorSetLayoutBinding> layoutBindings;
     for(auto& [binding, resource] : resources)
     {
-        if(std::holds_alternative<ConcreteBuffer*>(resource.m_resource))
+        if(std::holds_alternative<Uniform*>(resource.m_resource))
         {
             vk::DescriptorSetLayoutBinding uboLayoutBinding{.binding = binding,
                                                             .descriptorType = vk::DescriptorType::eUniformBuffer,
@@ -81,7 +82,17 @@ void Pipeline::createDescriptorSetLayout(const std::unordered_map<uint8_t, Pipel
             };
             layoutBindings.push_back(samplerLayoutBinding);
         }
-        //else if(std::holds_alternative<LightBuffer*>)
+        else if(std::holds_alternative<LightBuffer*>(resource.m_resource))
+        {
+            vk::DescriptorSetLayoutBinding storageBufferBinding{
+                .binding = binding,
+                .descriptorType = vk::DescriptorType::eStorageBuffer,
+                .descriptorCount = 1,
+                .stageFlags = resource.m_stage,
+                .pImmutableSamplers = nullptr,
+            };
+            layoutBindings.push_back(storageBufferBinding);
+        }
     }
 
     vk::DescriptorSetLayoutCreateInfo layoutInfo{
@@ -125,15 +136,20 @@ void Pipeline::createDescriptorPool(const std::unordered_map<uint8_t, PipelineRe
 {
     uint32_t uniformCount = 0;
     uint32_t textureCount = 0;
+    uint32_t storageBufferCount = 0;
     for(auto& [_, resource] : resources)
     {
-        if(std::holds_alternative<ConcreteBuffer*>(resource.m_resource))
+        if(std::holds_alternative<Uniform*>(resource.m_resource))
         {
             ++uniformCount;
         }
         else if(std::holds_alternative<Texture*>(resource.m_resource))
         {
             ++textureCount;
+        }
+        else if(std::holds_alternative<LightBuffer*>(resource.m_resource))
+        {
+            ++storageBufferCount;
         }
     }
 
@@ -146,6 +162,10 @@ void Pipeline::createDescriptorPool(const std::unordered_map<uint8_t, PipelineRe
     if(textureCount > 0)
     {
         poolSizes.push_back({vk::DescriptorType::eCombinedImageSampler, MAX_FRAMES_IN_FLIGHT * textureCount});
+    }
+    if(storageBufferCount > 0)
+    {
+        poolSizes.push_back({vk::DescriptorType::eStorageBuffer, MAX_FRAMES_IN_FLIGHT * storageBufferCount});
     }
 
     vk::DescriptorPoolCreateInfo poolInfo{
@@ -183,8 +203,10 @@ void Pipeline::createDescriptorSets(const std::unordered_map<uint8_t, PipelineRe
 
         std::vector<vk::DescriptorBufferInfo> bufferInfos;
         std::vector<vk::DescriptorImageInfo> imageInfos;
+        std::vector<vk::DescriptorBufferInfo> storageBufferInfos;
         bufferInfos.reserve(resources.size());
         imageInfos.reserve(resources.size());
+        storageBufferInfos.reserve(resources.size());
 
         for(auto& [binding, resource] : resources)
         {
@@ -194,9 +216,9 @@ void Pipeline::createDescriptorSets(const std::unordered_map<uint8_t, PipelineRe
             descriptorWrites[writesPos].dstArrayElement = 0;
             descriptorWrites[writesPos].descriptorCount = 1;
 
-            if(std::holds_alternative<ConcreteBuffer*>(resource.m_resource))
+            if(std::holds_alternative<Uniform*>(resource.m_resource))
             {
-                auto& uniform = std::get<ConcreteBuffer*>(resource.m_resource);
+                auto& uniform = std::get<Uniform*>(resource.m_resource);
                 bufferInfos.push_back({
                     .buffer = uniform->m_buffers[i],
                     .offset = 0,
@@ -222,6 +244,19 @@ void Pipeline::createDescriptorSets(const std::unordered_map<uint8_t, PipelineRe
 
                 descriptorWrites[writesPos].descriptorType = vk::DescriptorType::eCombinedImageSampler;
                 descriptorWrites[writesPos].pImageInfo = &imageInfos.back();
+            }
+            else if(std::holds_alternative<LightBuffer*>(resource.m_resource))
+            {
+                auto& storageBuffer = std::get<LightBuffer*>(resource.m_resource);
+
+                storageBufferInfos.push_back({
+                    .buffer = storageBuffer->m_buffers[i],
+                    .offset = 0,
+                    .range = storageBuffer->getBufferSize(),
+                });
+
+                descriptorWrites[writesPos].descriptorType = vk::DescriptorType::eStorageBuffer;
+                descriptorWrites[writesPos].pBufferInfo = &storageBufferInfos.back();
             }
 
             writesPos++;

@@ -48,6 +48,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include <engine/texture/texture.h>
 #include <engine/texture/texture_2d.h>
 #include <engine/texture/texture_cube.h>
+#include <engine/lights/lights.h>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -71,16 +72,35 @@ public:
         m_ui = std::make_shared<engine::UserInterface>(m_device, m_generalRenderPass->Get());
         m_renderer = std::make_shared<engine::Renderer>(m_device, m_swapChain, m_renderPasses, m_commandBuffer, m_camera, m_ui);
         m_window->SetResizeCallback(engine::Renderer::framebufferResizeCallback);
+        m_lights = std::make_unique<engine::LightBuffer>(m_device);
 
+        
         engine::Texture2DParams vikingTexParams{.m_filepath = "textures/viking_room.png"};
         engine::TextureCubeParams env_params{.m_filepaths = {
-                                                 "textures/skybox1.jpg",
-                                                 "textures/skybox2.jpg",
-                                                 "textures/skybox3.jpg",
-                                                 "textures/skybox4.jpg",
-                                                 "textures/skybox5.jpg",
-                                                 "textures/skybox6.jpg",
-                                             }};
+            "textures/skybox1.jpg",
+            "textures/skybox2.jpg",
+            "textures/skybox3.jpg",
+            "textures/skybox4.jpg",
+            "textures/skybox5.jpg",
+            "textures/skybox6.jpg",
+        }};
+
+        std::vector<engine::Light> lights;
+        lights.push_back({glm::vec4{0.0f, 0.0f, 0.0f, 1.0f}, glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}});
+        lights.push_back({glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}, glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}});
+
+        auto lightsUpdate = [&](engine::UpdatableBuffer& uniform, int currentImage) {
+            auto* lightBuffer = dynamic_cast<engine::LightBuffer*>(&uniform);
+            if(lightBuffer)
+            {
+                engine::LightBuffer::LightBufferObject ssbo{};
+                uint32_t count = std::min<uint32_t>(static_cast<uint32_t>(lights.size()), engine::LightBuffer::MAX_LIGHTS);
+                ssbo.count = count;
+                std::copy(lights.begin(), lights.begin() + count, ssbo.lights);
+
+                lightBuffer->updateBuffer(&ssbo, currentImage);
+            }
+        };
 
         auto cameraUpdate = [&](engine::UpdatableBuffer& uniform, int currentImage) {
             auto* camera = dynamic_cast<engine::UniformCamera*>(&uniform);
@@ -96,7 +116,7 @@ public:
             }
         };
 
-        auto lightBinding = [&](engine::UpdatableBuffer& uniform, int currentImage) {
+        auto shadowLightUpdate = [&](engine::UpdatableBuffer& uniform, int currentImage) {
             auto* light = dynamic_cast<engine::UniformLight*>(&uniform);
             if(light)
             {
@@ -131,7 +151,7 @@ public:
         m_testInterior->addTexture<engine::Texture2D, engine::Texture2DParams>(
             1, vk::ShaderStageFlagBits::eFragment, std::move(vikingTexParams));
         m_testInterior->addUniform<engine::UniformLight>(
-            2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, lightBinding);
+            2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, shadowLightUpdate);
         m_testInterior->setShadowLightPosition(&m_light_pos);
         m_testInterior->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraUpdate);
         m_testInterior->finalizeGameObject(
@@ -162,7 +182,7 @@ public:
         m_skull->addTexture<engine::Texture2D, engine::Texture2DParams>(
             1, vk::ShaderStageFlagBits::eFragment, std::move(engine::Texture2DParams{.m_filepath = "textures/Skull.jpg"}));
         m_skull->addUniform<engine::UniformLight>(
-            2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, lightBinding);
+            2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, shadowLightUpdate);
         m_skull->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraUpdate);
         m_skull->finalizeGameObject(
             m_renderPasses, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/textured_max_blinn.frag"});
@@ -194,6 +214,7 @@ private:
 
     glm::vec3 m_light_pos = glm::vec3(-2.0f, 0.1f, 0.0f);
     glm::vec3 m_light_facing = glm::vec3(1.0f);
+    std::unique_ptr<engine::LightBuffer> m_lights;
 
     void mainLoop()
     {

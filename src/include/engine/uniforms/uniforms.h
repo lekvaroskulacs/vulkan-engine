@@ -63,7 +63,16 @@ protected:
     vk::DeviceSize m_bufferSize;
 };
 
-class UniformGameObject : public ConcreteBuffer
+class Uniform : public ConcreteBuffer
+{
+protected:
+    explicit Uniform(std::shared_ptr<Device> device, vk::DeviceSize bufferSize)
+        : ConcreteBuffer(device, bufferSize, vk::BufferUsageFlagBits::eUniformBuffer)
+    {
+    }
+};
+
+class UniformGameObject : public Uniform
 {
 public:
     struct UniformBufferObject
@@ -74,13 +83,13 @@ public:
     };
 
     explicit UniformGameObject(std::shared_ptr<Device> device)
-        : ConcreteBuffer(device, sizeof(UniformBufferObject))
+        : Uniform(device, sizeof(UniformBufferObject))
     {
         m_bufferSize = sizeof(UniformBufferObject);
     }
 };
 
-class UniformCamera : public ConcreteBuffer
+class UniformCamera : public Uniform
 {
 public:
     struct UniformBufferObject
@@ -90,13 +99,13 @@ public:
     };
 
     explicit UniformCamera(std::shared_ptr<Device> device)
-        : ConcreteBuffer(device, sizeof(UniformBufferObject))
+        : Uniform(device, sizeof(UniformBufferObject))
     {
         m_bufferSize = sizeof(UniformBufferObject);
     }
 };
 
-class UniformLight : public ConcreteBuffer
+class UniformLight : public Uniform
 {
 public:
     struct UniformBufferObject
@@ -108,7 +117,7 @@ public:
     };
 
     explicit UniformLight(std::shared_ptr<Device> device)
-        : ConcreteBuffer(device, sizeof(UniformBufferObject))
+        : Uniform(device, sizeof(UniformBufferObject))
     {
         m_bufferSize = sizeof(UniformBufferObject);
     }
