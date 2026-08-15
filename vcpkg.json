@@ -2,6 +2,22 @@
     "name": "engine",
     "version": "0.1.0",
     "dependencies": [
-        "shaderc"
+        "shaderc",
+        {
+            "name": "glfw3",
+            "platform": "windows"
+        },
+        {
+            "name": "glm",
+            "platform": "windows"
+        },
+        {
+            "name": "vulkan-headers",
+            "platform": "windows"
+        },
+        {
+            "name": "vulkan-loader",
+            "platform": "windows"
+        }
     ]
 }

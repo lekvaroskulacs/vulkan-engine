@@ -32,7 +32,7 @@ inline std::vector<char> readFile(const std::string& filename)
 
 inline std::string readFileAsString(const std::string& filename)
 {
-    std::ifstream file(filename, std::ios::ate);
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
     if(!file.is_open())
     {

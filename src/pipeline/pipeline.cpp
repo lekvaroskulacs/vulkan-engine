@@ -122,8 +122,8 @@ vk::ShaderModule Pipeline::createShaderModule(const std::string& code, shaderc_s
 
 void Pipeline::createDescriptorPool(const std::unordered_map<uint8_t, PipelineResource>& resources)
 {
-    uint uniformCount = 0;
-    uint textureCount = 0;
+    uint32_t uniformCount = 0;
+    uint32_t textureCount = 0;
     for(auto& [_, resource] : resources)
     {
         if(std::holds_alternative<Uniform*>(resource.m_resource))

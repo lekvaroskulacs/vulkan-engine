@@ -1161,9 +1161,13 @@ inline typename conditional<true, long long, It>::type distance(It first, It las
 #        endif
 
 // Testing for relevant C++20 constexpr library features
+// MSVC reports these feature-test macros but its conformance checker rejects
+// this file's loop_parse_if_eight_digits() as not genuinely constexpr-evaluable,
+// so constexpr20 is disabled there regardless of feature detection.
 #        if FASTFLOAT_HAS_IS_CONSTANT_EVALUATED && FASTFLOAT_HAS_BIT_CAST &&                       \
             defined(__cpp_lib_constexpr_algorithms) &&                                             \
-            __cpp_lib_constexpr_algorithms >= 201806L /*For std::copy and std::fill*/
+            __cpp_lib_constexpr_algorithms >= 201806L /*For std::copy and std::fill*/ &&           \
+            !defined(_MSC_VER)
 #            define FASTFLOAT_CONSTEXPR20 constexpr
 #            define FASTFLOAT_IS_CONSTEXPR 1
 #        else

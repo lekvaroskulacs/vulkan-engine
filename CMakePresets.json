@@ -9,14 +9,38 @@
         {
             "name": "base",
             "hidden": true,
-            "generator": "Unix Makefiles",
             "binaryDir": "${sourceDir}/build_cmake/${presetName}",
             "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake"
         },
         {
+            "name": "linux-base",
+            "hidden": true,
+            "inherits": "base",
+            "generator": "Unix Makefiles",
+            "condition": {
+                "type": "notEquals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "windows-base",
+            "hidden": true,
+            "inherits": "base",
+            "generator": "Ninja",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            }
+        },
+        {
             "name": "release",
             "displayName": "Release",
-            "inherits": "base",
+            "inherits": "linux-base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
@@ -24,9 +48,43 @@
         {
             "name": "debug",
             "displayName": "Debug",
-            "inherits": "base",
+            "inherits": "linux-base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "windows-release",
+            "displayName": "Windows Release (MSVC + Ninja)",
+            "description": "Run from a Developer Command Prompt / Developer PowerShell for VS 2022 so cl.exe is on PATH.",
+            "inherits": "windows-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "windows-debug",
+            "displayName": "Windows Debug (MSVC + Ninja)",
+            "description": "Run from a Developer Command Prompt / Developer PowerShell for VS 2022 so cl.exe is on PATH.",
+            "inherits": "windows-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "windows-vs",
+            "displayName": "Windows (Visual Studio 2022 generator)",
+            "description": "Multi-config fallback that locates MSVC on its own, so it works from any shell (Git Bash included).",
+            "inherits": "base",
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
             }
         }
     ],
@@ -38,6 +96,24 @@
         {
             "name": "debug",
             "configurePreset": "debug"
+        },
+        {
+            "name": "windows-release",
+            "configurePreset": "windows-release"
+        },
+        {
+            "name": "windows-debug",
+            "configurePreset": "windows-debug"
+        },
+        {
+            "name": "windows-vs-release",
+            "configurePreset": "windows-vs",
+            "configuration": "Release"
+        },
+        {
+            "name": "windows-vs-debug",
+            "configurePreset": "windows-vs",
+            "configuration": "Debug"
         }
     ]
 }
