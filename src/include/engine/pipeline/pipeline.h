@@ -5,7 +5,6 @@
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
-#include <engine/lights/lights.h>
 #include <engine/renderpass/render_pass.h>
 #include <engine/texture/texture.h>
 #include <engine/uniforms/uniforms.h>
@@ -15,7 +14,7 @@
 namespace engine
 {
 
-using Resource = std::variant<Uniform*, LightBuffer*, Texture*>;
+using Resource = std::variant<Uniform*, Texture*>;
 struct PipelineResource
 {
     vk::ShaderStageFlags m_stage;

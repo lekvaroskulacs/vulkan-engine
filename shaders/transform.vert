@@ -8,7 +8,7 @@ layout(location = 0) out vec4 outPos;
 layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec2 fragTexCoord;
 
-layout(binding = 0) uniform GameObject {
+layout(set = 1, binding = 0) uniform GameObject {
     mat4 model;
     mat4 view;
     mat4 proj;

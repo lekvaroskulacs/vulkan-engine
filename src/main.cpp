@@ -37,6 +37,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include <engine/command_buffer/command_buffer.h>
 #include <engine/device/device.h>
 #include <engine/game_object/game_object.h>
+#include <engine/global_descriptor_set/global_descriptor_set.h>
 #include <engine/mesh/mesh.h>
 #include <engine/renderer/renderer.h>
 #include <engine/swap_chain/swap_chain.h>
@@ -70,11 +71,12 @@ public:
                           {engine::RenderPassStage::General, m_generalRenderPass}};
         m_camera = std::make_shared<engine::Camera>(m_window->Get(), m_swapChain);
         m_ui = std::make_shared<engine::UserInterface>(m_device, m_generalRenderPass->Get());
-        m_renderer = std::make_shared<engine::Renderer>(m_device, m_swapChain, m_renderPasses, m_commandBuffer, m_camera, m_ui);
+        m_globalSet = std::make_shared<engine::GlobalDescriptorSet>(m_device);
+        m_renderer = std::make_shared<engine::Renderer>(
+            m_device, m_swapChain, m_renderPasses, m_commandBuffer, m_camera, m_ui, m_globalSet);
         m_window->SetResizeCallback(engine::Renderer::framebufferResizeCallback);
-        m_lights = std::make_unique<engine::LightBuffer>(m_device);
 
-        
+
         engine::Texture2DParams vikingTexParams{.m_filepath = "textures/viking_room.png"};
         engine::TextureCubeParams env_params{.m_filepaths = {
             "textures/skybox1.jpg",
@@ -85,36 +87,8 @@ public:
             "textures/skybox6.jpg",
         }};
 
-        std::vector<engine::Light> lights;
-        lights.push_back({glm::vec4{0.0f, 0.0f, 0.0f, 1.0f}, glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}});
-        lights.push_back({glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}, glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}});
-
-        auto lightsUpdate = [&](engine::UpdatableBuffer& uniform, int currentImage) {
-            auto* lightBuffer = dynamic_cast<engine::LightBuffer*>(&uniform);
-            if(lightBuffer)
-            {
-                engine::LightBuffer::LightBufferObject ssbo{};
-                uint32_t count = std::min<uint32_t>(static_cast<uint32_t>(lights.size()), engine::LightBuffer::MAX_LIGHTS);
-                ssbo.count = count;
-                std::copy(lights.begin(), lights.begin() + count, ssbo.lights);
-
-                lightBuffer->updateBuffer(&ssbo, currentImage);
-            }
-        };
-
-        auto cameraUpdate = [&](engine::UpdatableBuffer& uniform, int currentImage) {
-            auto* camera = dynamic_cast<engine::UniformCamera*>(&uniform);
-            if(camera)
-            {
-                engine::UniformCamera::UniformBufferObject ubo;
-                glm::mat4 rayDir{1.0};
-                rayDir = glm::translate(rayDir, m_camera->m_cameraPos);
-                rayDir = glm::inverse(m_camera->m_proj * m_camera->m_view * rayDir);
-                ubo.rayDir = rayDir;
-                ubo.position = glm::vec4(m_camera->m_cameraPos, 1.0);
-                camera->updateBuffer(&ubo, currentImage);
-            }
-        };
+        m_lights.push_back({glm::vec4{0.0f, 0.0f, 0.0f, 1.0f}, glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}});
+        m_lights.push_back({glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}, glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}});
 
         auto shadowLightUpdate = [&](engine::UpdatableBuffer& uniform, int currentImage) {
             auto* light = dynamic_cast<engine::UniformLight*>(&uniform);
@@ -153,17 +127,18 @@ public:
         m_testInterior->addUniform<engine::UniformLight>(
             2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, shadowLightUpdate);
         m_testInterior->setShadowLightPosition(&m_light_pos);
-        m_testInterior->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraUpdate);
         m_testInterior->finalizeGameObject(
-            m_renderPasses, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/omni_shadow.frag"}, true);
+            m_renderPasses,
+            *m_globalSet,
+            {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/omni_shadow.frag"},
+            true);
 
         auto fsquad = std::make_unique<engine::FullscreenQuadMesh>(m_device, m_commandBuffer);
         m_skybox = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, std::move(fsquad));
-        m_skybox->addUniform<engine::UniformCamera>(0, vk::ShaderStageFlagBits::eVertex, cameraUpdate);
         m_skybox->addTexture<engine::TextureCube, engine::TextureCubeParams>(
             1, vk::ShaderStageFlagBits::eFragment, std::move(env_params));
-        m_skybox->finalizeGameObject(m_renderPasses,
-                                     {.m_vertexShaderPath = "shaders/env.vert", .m_fragmentShaderPath = "shaders/env.frag"});
+        m_skybox->finalizeGameObject(
+            m_renderPasses, *m_globalSet, {.m_vertexShaderPath = "shaders/env.vert", .m_fragmentShaderPath = "shaders/env.frag"});
 
         m_skull = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, "models/skull.obj");
         m_skull->addUniform<engine::UniformGameObject>(
@@ -183,9 +158,10 @@ public:
             1, vk::ShaderStageFlagBits::eFragment, std::move(engine::Texture2DParams{.m_filepath = "textures/Skull.jpg"}));
         m_skull->addUniform<engine::UniformLight>(
             2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, shadowLightUpdate);
-        m_skull->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraUpdate);
         m_skull->finalizeGameObject(
-            m_renderPasses, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/textured_max_blinn.frag"});
+            m_renderPasses,
+            *m_globalSet,
+            {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/textured_max_blinn.frag"});
 
     }
 
@@ -205,6 +181,7 @@ private:
     std::shared_ptr<engine::CommandBuffer> m_commandBuffer;
     std::shared_ptr<engine::Renderer> m_renderer;
     std::shared_ptr<engine::UserInterface> m_ui;
+    std::shared_ptr<engine::GlobalDescriptorSet> m_globalSet;
 
     std::shared_ptr<engine::Camera> m_camera;
 
@@ -214,7 +191,7 @@ private:
 
     glm::vec3 m_light_pos = glm::vec3(-2.0f, 0.1f, 0.0f);
     glm::vec3 m_light_facing = glm::vec3(1.0f);
-    std::unique_ptr<engine::LightBuffer> m_lights;
+    std::vector<engine::Light> m_lights;
 
     void mainLoop()
     {
@@ -235,6 +212,9 @@ private:
             refs.m_light_pos = &m_light_pos;
             refs.m_light_facing = &m_light_facing;
             m_ui->buildInterface(refs);
+
+            m_globalSet->updateCamera(m_renderer->GetCurrentFrame(), *m_camera);
+            m_globalSet->updateLights(m_renderer->GetCurrentFrame(), m_lights);
 
             std::vector<engine::DrawFrameData> params_list;
             params_list.push_back(m_skybox->getDrawFrameParams());

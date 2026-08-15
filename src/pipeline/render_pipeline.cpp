@@ -1,12 +1,16 @@
 #include <engine/pipeline/render_pipeline.h>
 
+#include <array>
+
 namespace engine
 {
 
 PipelineRender::PipelineRender(std::shared_ptr<Device> device,
                                std::shared_ptr<RenderPass> renderPass,
-                               const CreatePipelineParams& params)
+                               const CreatePipelineParams& params,
+                               vk::DescriptorSetLayout globalSetLayout)
     : Pipeline(device, renderPass, params)
+    , m_globalSetLayout(globalSetLayout)
 {
     createPipeline(params.m_shaderPaths);
 }
@@ -107,9 +111,10 @@ void PipelineRender::createPipeline(const ShaderCodePaths& paths)
     colorBlending.blendConstants[2] = 0.0f;
     colorBlending.blendConstants[3] = 0.0f;
 
+    std::array<vk::DescriptorSetLayout, 2> setLayouts = {m_globalSetLayout, m_descriptorSetLayout};
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
-        .setLayoutCount = 1,
-        .pSetLayouts = &m_descriptorSetLayout,
+        .setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+        .pSetLayouts = setLayouts.data(),
         .pushConstantRangeCount = 0,
         .pPushConstantRanges = nullptr,
     };

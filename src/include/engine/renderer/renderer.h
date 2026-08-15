@@ -4,6 +4,7 @@
 #include <engine/renderpass/render_pass.h>
 #include <engine/camera/camera.h>
 #include <engine/command_buffer/command_buffer.h>
+#include <engine/global_descriptor_set/global_descriptor_set.h>
 #include <engine/mesh/mesh.h>
 #include <engine/swap_chain/swap_chain.h>
 #include <engine/user_interface/user_interface.h>
@@ -38,7 +39,8 @@ public:
                       RenderPassList renderPasses,
                       std::shared_ptr<CommandBuffer> commandBuffers,
                       std::shared_ptr<Camera> camera,
-                      std::shared_ptr<UserInterface> ui);
+                      std::shared_ptr<UserInterface> ui,
+                      std::shared_ptr<GlobalDescriptorSet> globalDescriptorSet);
     ~Renderer();
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
@@ -47,6 +49,11 @@ public:
 
     void drawFrame(const std::vector<DrawFrameData>& params_list);
     void updateUniformBuffers(uint32_t currentImage, const DrawFrameData& params_list);
+
+    uint32_t GetCurrentFrame() const
+    {
+        return m_currentFrame;
+    }
 
 private:
     void createSyncObjects();
@@ -58,6 +65,7 @@ private:
     std::shared_ptr<CommandBuffer> m_commandBuffers;
     std::shared_ptr<Camera> m_camera;
     std::shared_ptr<UserInterface> m_ui;
+    std::shared_ptr<GlobalDescriptorSet> m_globalDescriptorSet;
 
     std::vector<vk::Semaphore> m_imageAvailableSemaphores;
     std::vector<vk::Semaphore> m_renderFinishedSemaphores;

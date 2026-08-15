@@ -1,3 +1,4 @@
+#include <engine/global_descriptor_set/global_descriptor_set.h>
 #include <engine/pipeline/render_pipeline.h>
 #include <engine/pipeline/shadowmap_omni_pipeline.h>
 #include <engine/renderer/renderer.h>
@@ -60,18 +61,14 @@ public:
         m_shadow_light_position = position;
     }
 
-    void addLights(uint8_t binding, LightBuffer* lights, std::function<void(UpdatableBuffer&, int)> updateFuncion)
-    {
-        m_pipelineResources[binding] = {.m_stage = vk::ShaderStageFlagBits::eAll, .m_resource = lights};
-        m_updatables.push_back(lights);
-        m_updateFunctions.push_back(updateFuncion);
-    }
-
-    void finalizeGameObject(const RenderPassList& renderPasses, const ShaderCodePaths& shaders, bool useShadows = false)
+    void finalizeGameObject(const RenderPassList& renderPasses,
+                            const GlobalDescriptorSet& globalSet,
+                            const ShaderCodePaths& shaders,
+                            bool useShadows = false)
     {
         auto generalPass = findRenderPass(renderPasses, RenderPassStage::General);
 
-        auto shadowIdx = m_pipelineResources.size();
+        constexpr uint8_t shadowIdx = 4; // matches the fixed `binding = 4` every shadow-consuming shader declares for shadowMap
         if(useShadows)
         {
             m_pipelineResources[shadowIdx] = {
@@ -82,7 +79,7 @@ public:
         CreatePipelineParams createParams{};
         createParams.m_shaderPaths = shaders;
         createParams.m_resources = m_pipelineResources;
-        m_pipeline = std::make_unique<PipelineRender>(m_device, generalPass, createParams);
+        m_pipeline = std::make_unique<PipelineRender>(m_device, generalPass, createParams, globalSet.GetLayout());
 
         if(useShadows)
         {

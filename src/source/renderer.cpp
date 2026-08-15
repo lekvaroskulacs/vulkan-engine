@@ -15,13 +15,15 @@ Renderer::Renderer(std::shared_ptr<Device> device,
                    RenderPassList renderPasses,
                    std::shared_ptr<CommandBuffer> commandBuffers,
                    std::shared_ptr<Camera> camera,
-                   std::shared_ptr<UserInterface> ui)
+                   std::shared_ptr<UserInterface> ui,
+                   std::shared_ptr<GlobalDescriptorSet> globalDescriptorSet)
     : m_device{device}
     , m_swapChain{swapChain}
     , m_renderPasses{std::move(renderPasses)}
     , m_commandBuffers{commandBuffers}
     , m_camera{camera}
     , m_ui{ui}
+    , m_globalDescriptorSet{globalDescriptorSet}
 {
     createSyncObjects();
 }
@@ -72,6 +74,8 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
             };
             commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
 
+            bool globalSetBound = false;
+
             for(const auto& drawable : params_list)
             {
                 if(drawable.m_renderPassInfo.find(stage) == drawable.m_renderPassInfo.end())
@@ -91,6 +95,15 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
                 }
 
                 commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, params.m_pipeline.Get());
+
+                if(stage == RenderPassStage::General && !globalSetBound)
+                {
+                    vk::DescriptorSet globalSet = m_globalDescriptorSet->GetDescriptorSet(m_currentFrame);
+                    commandBuffer.bindDescriptorSets(
+                        vk::PipelineBindPoint::eGraphics, params.m_pipeline.GetLayout(), 0, 1, &globalSet, 0, nullptr);
+                    globalSetBound = true;
+                }
+
                 vk::Viewport viewport{
                     .x = 0.0f,
                     .y = 0.0f,
@@ -112,9 +125,10 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
                 vk::DeviceSize offsets[] = {0};
                 commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
                 commandBuffer.bindIndexBuffer(drawable.m_mesh.GetIndexBuffer(), 0, vk::IndexType::eUint32);
+                uint32_t objectSetIndex = (stage == RenderPassStage::General) ? 1 : 0;
                 commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                                  params.m_pipeline.GetLayout(),
-                                                 0,
+                                                 objectSetIndex,
                                                  1,
                                                  &params.m_pipeline.GetDescriptorSets()[m_currentFrame],
                                                  0,

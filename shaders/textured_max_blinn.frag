@@ -6,17 +6,27 @@ layout(location = 2) in vec2 fragTexCoord;
 
 layout(location = 0) out vec4 outColor;
 
-layout(binding = 1) uniform sampler2D texSampler;
+layout(set = 1, binding = 1) uniform sampler2D texSampler;
 
-layout(binding = 2) uniform Light {
+layout(set = 1, binding = 2) uniform Light {
      vec4 position;
      vec4 powerDensity;
 } light;
 
-layout(binding = 3) uniform Camera {
+layout(set = 0, binding = 0) uniform Camera {
      mat4 rayDir;
      vec4 position;
 } camera;
+
+struct SceneLight {
+     vec4 position;
+     vec4 colorIntensity;
+};
+
+layout(set = 0, binding = 1) buffer LightList {
+     uint count;
+     SceneLight lights[64];
+} sceneLights;
 
 const float pi = 3.1415;
 
