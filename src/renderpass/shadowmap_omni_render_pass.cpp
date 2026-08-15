@@ -1,8 +1,8 @@
-#include "shadowmap_omni_render_pass.h"
-#include "../include/renderer.h"
-#include "../texture/texture_depth_stencil.h"
-#include "../texture/texture_framebuffer.h"
-#include "../texture/texture_view_only.h"
+#include <engine/renderpass/shadowmap_omni_render_pass.h>
+#include <engine/renderer/renderer.h>
+#include <engine/texture/texture_depth_stencil.h>
+#include <engine/texture/texture_framebuffer.h>
+#include <engine/texture/texture_view_only.h>
 #include <array>
 #include <stdexcept>
 
@@ -38,7 +38,7 @@ Texture* OmniShadowMapRenderPass::GetRenderTarget(uint32_t index) const
 
 std::optional<PushConstantData> OmniShadowMapRenderPass::GetPushConstants(uint32_t instance, const DrawFrameData& frame) const
 {
-    auto lightPos = frame.m_light_position;
+    auto lightPos = frame.m_shadow_light_position;
     glm::mat4 viewMatrix = glm::mat4(1.0f);
     switch(instance)
     {

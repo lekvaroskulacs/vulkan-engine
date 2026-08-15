@@ -1,6 +1,6 @@
-#include "../include/mesh.h"
-#include "../include/device.h"
-#include "../include/vertex.h"
+#include <engine/mesh/mesh.h>
+#include <engine/device/device.h>
+#include <engine/vertex/vertex.h>
 #include <cstring>
 #include <stdexcept>
 #include <unordered_map>

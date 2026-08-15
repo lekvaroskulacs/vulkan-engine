@@ -1,4 +1,4 @@
-#include "pipeline.h"
+#include <engine/pipeline/pipeline.h>
 #include <stdexcept>
 
 namespace engine
@@ -61,7 +61,7 @@ void Pipeline::createDescriptorSetLayout(const std::unordered_map<uint8_t, Pipel
     std::vector<vk::DescriptorSetLayoutBinding> layoutBindings;
     for(auto& [binding, resource] : resources)
     {
-        if(std::holds_alternative<Uniform*>(resource.m_resource))
+        if(std::holds_alternative<ConcreteBuffer*>(resource.m_resource))
         {
             vk::DescriptorSetLayoutBinding uboLayoutBinding{.binding = binding,
                                                             .descriptorType = vk::DescriptorType::eUniformBuffer,
@@ -81,6 +81,7 @@ void Pipeline::createDescriptorSetLayout(const std::unordered_map<uint8_t, Pipel
             };
             layoutBindings.push_back(samplerLayoutBinding);
         }
+        //else if(std::holds_alternative<LightBuffer*>)
     }
 
     vk::DescriptorSetLayoutCreateInfo layoutInfo{
@@ -126,7 +127,7 @@ void Pipeline::createDescriptorPool(const std::unordered_map<uint8_t, PipelineRe
     uint32_t textureCount = 0;
     for(auto& [_, resource] : resources)
     {
-        if(std::holds_alternative<Uniform*>(resource.m_resource))
+        if(std::holds_alternative<ConcreteBuffer*>(resource.m_resource))
         {
             ++uniformCount;
         }
@@ -193,11 +194,11 @@ void Pipeline::createDescriptorSets(const std::unordered_map<uint8_t, PipelineRe
             descriptorWrites[writesPos].dstArrayElement = 0;
             descriptorWrites[writesPos].descriptorCount = 1;
 
-            if(std::holds_alternative<Uniform*>(resource.m_resource))
+            if(std::holds_alternative<ConcreteBuffer*>(resource.m_resource))
             {
-                auto& uniform = std::get<Uniform*>(resource.m_resource);
+                auto& uniform = std::get<ConcreteBuffer*>(resource.m_resource);
                 bufferInfos.push_back({
-                    .buffer = uniform->m_uniformBuffers[i],
+                    .buffer = uniform->m_buffers[i],
                     .offset = 0,
                     .range = uniform->getBufferSize(),
                 });

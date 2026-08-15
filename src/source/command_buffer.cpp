@@ -1,4 +1,4 @@
-#include "../include/command_buffer.h"
+#include <engine/command_buffer/command_buffer.h>
 
 namespace engine
 {

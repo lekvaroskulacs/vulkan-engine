@@ -1,4 +1,4 @@
-#include "shadowmap_omni_pipeline.h"
+#include <engine/pipeline/shadowmap_omni_pipeline.h>
 
 namespace engine
 {

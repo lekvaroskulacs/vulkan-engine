@@ -1,5 +1,5 @@
-#include "shadowmap_render_pass.h"
-#include "../texture/texture_framebuffer.h"
+#include <engine/renderpass/shadowmap_render_pass.h>
+#include <engine/texture/texture_framebuffer.h>
 #include <array>
 #include <stdexcept>
 

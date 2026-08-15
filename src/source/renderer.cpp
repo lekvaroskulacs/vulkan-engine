@@ -1,4 +1,4 @@
-#include "../include/renderer.h"
+#include <engine/renderer/renderer.h>
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
@@ -99,11 +99,13 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
                     .minDepth = 0.0f,
                     .maxDepth = 1.0f,
                 };
+
                 commandBuffer.setViewport(0, 1, &viewport);
                 vk::Rect2D scissor{
                     .offset = {0, 0},
                     .extent = extent,
                 };
+                
                 commandBuffer.setScissor(0, 1, &scissor);
 
                 vk::Buffer vertexBuffers[] = {drawable.m_mesh.GetVertexBuffer()};
@@ -139,6 +141,7 @@ void Renderer::drawFrame(const std::vector<DrawFrameData>& params_list)
     uint32_t imageIndex;
     vk::Result result = m_device->GetDevice().acquireNextImageKHR(
         m_swapChain->Get(), UINT64_MAX, m_imageAvailableSemaphores[m_currentFrame], VK_NULL_HANDLE, &imageIndex);
+    
     if(result == vk::Result::eErrorOutOfDateKHR)
     {
         recreateSwapChainResources();
@@ -160,6 +163,7 @@ void Renderer::drawFrame(const std::vector<DrawFrameData>& params_list)
     vk::Semaphore waitSemaphores[] = {m_imageAvailableSemaphores[m_currentFrame]};
     vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput |
                                            vk::PipelineStageFlagBits::eEarlyFragmentTests};
+
     vk::Semaphore signalSemaphores[] = {m_renderFinishedSemaphores[imageIndex]};
     vk::SubmitInfo submitInfo{
         .waitSemaphoreCount = 1,
@@ -170,10 +174,12 @@ void Renderer::drawFrame(const std::vector<DrawFrameData>& params_list)
         .signalSemaphoreCount = 1,
         .pSignalSemaphores = signalSemaphores,
     };
+
     if(m_device->GetGraphicsQueue().submit(1, &submitInfo, m_inFlightFences[m_currentFrame]) != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
+
     vk::SwapchainKHR swapChains[] = {m_swapChain->Get()};
     vk::PresentInfoKHR presentInfo{
         .waitSemaphoreCount = 1,
@@ -184,6 +190,7 @@ void Renderer::drawFrame(const std::vector<DrawFrameData>& params_list)
         .pResults = nullptr,
     };
     result = m_device->GetPresentQueue().presentKHR(&presentInfo);
+
     if(result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_framebufferResized)
     {
         recreateSwapChainResources();
@@ -192,6 +199,7 @@ void Renderer::drawFrame(const std::vector<DrawFrameData>& params_list)
     {
         throw std::runtime_error("Failed to present swap chain image!");
     }
+
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 

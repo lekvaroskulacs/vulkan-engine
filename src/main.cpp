@@ -32,22 +32,22 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #define TINYOBJLOADER_IMPLEMENTATION
 #define VMA_IMPLEMENTATION
 
-#include "fullscreen_quad.h"
-#include "include/camera.h"
-#include "include/command_buffer.h"
-#include "include/device.h"
-#include "include/game_object.h"
-#include "include/mesh.h"
-#include "include/renderer.h"
-#include "include/swap_chain.h"
-#include "include/uniforms.h"
-#include "include/user_interface.h"
-#include "pipeline/pipeline.h"
-#include "renderpass/general_render_pass.h"
-#include "renderpass/shadowmap_omni_render_pass.h"
-#include "texture/texture.h"
-#include "texture/texture_2d.h"
-#include "texture/texture_cube.h"
+#include <engine/fullscreen_quad/fullscreen_quad.h>
+#include <engine/camera/camera.h>
+#include <engine/command_buffer/command_buffer.h>
+#include <engine/device/device.h>
+#include <engine/game_object/game_object.h>
+#include <engine/mesh/mesh.h>
+#include <engine/renderer/renderer.h>
+#include <engine/swap_chain/swap_chain.h>
+#include <engine/uniforms/uniforms.h>
+#include <engine/user_interface/user_interface.h>
+#include <engine/pipeline/pipeline.h>
+#include <engine/renderpass/general_render_pass.h>
+#include <engine/renderpass/shadowmap_omni_render_pass.h>
+#include <engine/texture/texture.h>
+#include <engine/texture/texture_2d.h>
+#include <engine/texture/texture_cube.h>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -82,7 +82,7 @@ public:
                                                  "textures/skybox6.jpg",
                                              }};
 
-        auto cameraUpdate = [&](engine::Uniform& uniform, int currentImage) {
+        auto cameraUpdate = [&](engine::UpdatableBuffer& uniform, int currentImage) {
             auto* camera = dynamic_cast<engine::UniformCamera*>(&uniform);
             if(camera)
             {
@@ -96,7 +96,7 @@ public:
             }
         };
 
-        auto lightBinding = [&](engine::Uniform& uniform, int currentImage) {
+        auto lightBinding = [&](engine::UpdatableBuffer& uniform, int currentImage) {
             auto* light = dynamic_cast<engine::UniformLight*>(&uniform);
             if(light)
             {
@@ -117,7 +117,7 @@ public:
         auto debug = std::make_unique<engine::FullscreenQuadMesh>(m_device, m_commandBuffer);
         m_testInterior = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, "models/InteriorTest.obj");
         m_testInterior->addUniform<engine::UniformGameObject>(
-            0, vk::ShaderStageFlagBits::eVertex, [&](engine::Uniform& uniform, int currentImage) {
+            0, vk::ShaderStageFlagBits::eVertex, [&](engine::UpdatableBuffer& uniform, int currentImage) {
                 auto* mvp = dynamic_cast<engine::UniformGameObject*>(&uniform);
                 if(mvp)
                 {
@@ -132,7 +132,7 @@ public:
             1, vk::ShaderStageFlagBits::eFragment, std::move(vikingTexParams));
         m_testInterior->addUniform<engine::UniformLight>(
             2, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, lightBinding);
-        m_testInterior->addLight(&m_light_pos);
+        m_testInterior->setShadowLightPosition(&m_light_pos);
         m_testInterior->addUniform<engine::UniformCamera>(3, vk::ShaderStageFlagBits::eFragment, cameraUpdate);
         m_testInterior->finalizeGameObject(
             m_renderPasses, {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/omni_shadow.frag"}, true);
@@ -147,7 +147,7 @@ public:
 
         m_skull = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, "models/skull.obj");
         m_skull->addUniform<engine::UniformGameObject>(
-            0, vk::ShaderStageFlagBits::eVertex, [&](engine::Uniform& uniform, int currentImage) {
+            0, vk::ShaderStageFlagBits::eVertex, [&](engine::UpdatableBuffer& uniform, int currentImage) {
                 auto* mvp = dynamic_cast<engine::UniformGameObject*>(&uniform);
                 if(mvp)
                 {
