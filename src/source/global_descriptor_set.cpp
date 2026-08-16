@@ -37,7 +37,7 @@ vk::DescriptorSet GlobalDescriptorSet::GetDescriptorSet(uint32_t frameIndex) con
     return m_descriptorSets[frameIndex];
 }
 
-// TODO: can these be in anonymous namespace (static)?
+// TODO: can these be more generic so i dont have to call them manually in main?
 void GlobalDescriptorSet::updateCamera(uint32_t frameIndex, const Camera& camera)
 {
     UniformCamera::UniformBufferObject ubo{};

@@ -1,4 +1,7 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "scene_light.glsl"
 
 layout(location = 0) in vec4 worldPos;
 layout(location = 1) in vec4 worldNormal;
@@ -17,16 +20,6 @@ layout(set = 0, binding = 0) uniform Camera {
      mat4 rayDir;
      vec4 position;
 } camera;
-
-struct SceneLight {
-     vec4 position;
-     vec4 colorIntensity;
-};
-
-layout(set = 0, binding = 1) buffer LightList {
-     uint count;
-     SceneLight lights[64];
-} sceneLights;
 
 const float pi = 3.1415;
 
@@ -53,6 +46,20 @@ vec3 shade(
      return powerDensity * cosa * brdf(normal, lightDir, viewDir);
 }
 
+vec3 iterateLights(vec3 worldPosition, vec3 normal)
+{
+    vec3 viewDir = normalize(camera.position.xyz - worldPosition);
+    vec3 radiance = vec3(0.0);
+    for (int i = 0; i < sceneLights.count; i++)
+    {
+        vec3 lightDiff = sceneLights.lights[i].position.xyz - worldPosition;
+        vec3 lightDir = normalize(lightDiff);
+        float lightDist2 = dot(lightDiff, lightDiff);
+        radiance += shade(sceneLights.lights[i].colorIntensity.xyz / lightDist2, normal, lightDir, viewDir);
+    }
+    return radiance;
+}
+
 void main() {
      vec3 normal = normalize(worldNormal.xyz);
      vec3 x = worldPos.xyz / worldPos.w;
@@ -62,7 +69,8 @@ void main() {
      vec3 viewDir = normalize(camera.position.xyz - x);
 
      vec3 texColor = texture(texSampler, fragTexCoord).xyz;
-     vec3 radiance = shade(light.powerDensity.xyz / lightDiff2, normal, lightDir, viewDir);
+     vec3 radiance = iterateLights(x, normal);
+     radiance += shade(light.powerDensity.xyz / lightDiff2, normal, lightDir, viewDir);
      outColor = vec4(texColor * radiance, 1.0);
 
 }

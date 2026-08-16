@@ -1,8 +1,57 @@
 #include <engine/pipeline/pipeline.h>
+
+#include <fstream>
+#include <memory>
 #include <stdexcept>
+#include <string>
+#include <utility>
 
 namespace engine
 {
+
+namespace
+{
+
+// Resolves #include "foo.glsl" directives against the shaders/ directory (flat, no nesting).
+class ShaderIncluder : public shaderc::CompileOptions::IncluderInterface
+{
+public:
+    shaderc_include_result* GetInclude(const char* requestedSource,
+                                       shaderc_include_type /*type*/,
+                                       const char* /*requestingSource*/,
+                                       size_t /*includeDepth*/) override
+    {
+        auto* name = new std::string("shaders/" + std::string(requestedSource));
+        auto* content = new std::string();
+
+        std::ifstream file(*name, std::ios::ate | std::ios::binary);
+        if(file.is_open())
+        {
+            size_t size = static_cast<size_t>(file.tellg());
+            content->resize(size);
+            file.seekg(0);
+            file.read(content->data(), size);
+        }
+        else
+        {
+            *content = "#error \"Failed to open include file: " + *name + "\"";
+        }
+
+        return new shaderc_include_result{
+            name->c_str(), name->size(), content->c_str(), content->size(), new std::pair(name, content)};
+    }
+
+    void ReleaseInclude(shaderc_include_result* data) override
+    {
+        auto* owned = static_cast<std::pair<std::string*, std::string*>*>(data->user_data);
+        delete owned->first;
+        delete owned->second;
+        delete owned;
+        delete data;
+    }
+};
+
+} // namespace
 
 VkDescriptorSetLayout Pipeline::GetDescriptorSetLayout()
 {
@@ -98,8 +147,9 @@ vk::ShaderModule Pipeline::createShaderModule(const std::string& code, shaderc_s
 {
     shaderc::Compiler compiler;
     shaderc::CompileOptions options;
+    options.SetIncluder(std::make_unique<ShaderIncluder>());
 
-    shaderc::SpvCompilationResult shader = compiler.CompileGlslToSpv(code, kind, inputFile.c_str());
+    shaderc::SpvCompilationResult shader = compiler.CompileGlslToSpv(code, kind, inputFile.c_str(), options);
     if(shader.GetCompilationStatus() != shaderc_compilation_status_success)
     {
         std::cerr << shader.GetErrorMessage();

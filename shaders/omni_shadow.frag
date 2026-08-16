@@ -1,4 +1,7 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "scene_light.glsl"
 
 layout(location = 0) in vec4 worldPos;
 layout(location = 1) in vec4 worldNormal;
@@ -20,16 +23,6 @@ layout(set = 0, binding = 0) uniform Camera {
 } camera;
 
 layout(set = 1, binding = 4) uniform samplerCube shadowMap;
-
-struct SceneLight {
-    vec4 position;
-    vec4 colorIntensity;
-};
-
-layout(set = 0, binding = 1) buffer LightList {
-    uint count;
-    SceneLight lights[64];
-} sceneLights;
 
 const float pi = 3.1415;
 
@@ -87,6 +80,20 @@ float linearizeDepth(float depth)
 // 	return shadowFactor / count;
 // }
 
+vec3 iterateLights(vec3 worldPosition, vec3 normal)
+{
+    vec3 viewDir = normalize(camera.position.xyz - worldPosition);
+    vec3 radiance = vec3(0.0);
+    for (int i = 0; i < sceneLights.count; i++)
+    {
+        vec3 lightDiff = sceneLights.lights[i].position.xyz - worldPosition;
+        vec3 lightDir = normalize(lightDiff);
+        float lightDist2 = dot(lightDiff, lightDiff);
+        radiance += shade(sceneLights.lights[i].colorIntensity.xyz / lightDist2, normal, lightDir, viewDir);
+    }
+    return radiance;
+}
+
 void main() {
     vec3 normal = normalize(worldNormal.xyz);
     vec3 x = worldPos.xyz / worldPos.w;
@@ -97,7 +104,6 @@ void main() {
 
     vec3 radiance = shade(light.powerDensity.xyz / lightDiff2, normal, lightDir, viewDir);
 
-    //vec4 lightSpacePos = light.shadowViewProj * worldPos;
     float closestDepth = texture(shadowMap, x - light.position.xyz).r;
     float currentDepth = sqrt(lightDiff2);
 
@@ -108,13 +114,14 @@ void main() {
         float shadowFactor = 0.8;
         vec3 shadowColor = vec3(0.0, 0.0, 0.0);
         vec3 color = shadowColor * shadowFactor + radiance * (1 - shadowFactor);
-        outColor = vec4(radiance * 0.2, 1.0);
-    }
-    else
-    {
-        outColor = vec4(radiance, 1.0);
+        radiance *= 0.2;
     }
     
+
+    radiance += iterateLights(x, normal);
+    
+    outColor = vec4(radiance, 1.0);
+
     //outColor = vec4(vec3(closestDepth), 1.0);
 
 }
