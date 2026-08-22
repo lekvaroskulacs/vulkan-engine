@@ -110,6 +110,7 @@ private:
     vk::Device m_device;
     vk::Queue m_graphicsQueue;
     vk::Queue m_presentQueue;
+    vk::Queue m_computeQueue;
     vk::SurfaceKHR m_surface;
 
 public:

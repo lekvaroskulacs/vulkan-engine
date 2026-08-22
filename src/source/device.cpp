@@ -486,6 +486,7 @@ void Device::createLogicalDevice()
 
     m_device.getQueue(indices.m_graphicsFamily.value(), 0, &m_graphicsQueue);
     m_device.getQueue(indices.m_presentFamily.value(), 0, &m_presentQueue);
+    m_device.getQueue(indices.m_graphicsFamily.value(), 0, &m_computeQueue);
 }
 
 void Device::createMemoryAllocator()

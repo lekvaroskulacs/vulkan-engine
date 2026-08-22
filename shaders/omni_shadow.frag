@@ -1,7 +1,7 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-#include "scene_light.glsl"
+#include "common/shading.glsl"
 
 layout(location = 0) in vec4 worldPos;
 layout(location = 1) in vec4 worldNormal;
@@ -17,37 +17,7 @@ layout(set = 1, binding = 2) uniform Light {
     mat4 shadowViewProj;
 } light;
 
-layout(set = 0, binding = 0) uniform Camera {
-    mat4 rayDir;
-    vec4 position;
-} camera;
-
 layout(set = 1, binding = 4) uniform samplerCube shadowMap;
-
-const float pi = 3.1415;
-
-vec3 brdf(
-    vec3 normal,
-    vec3 lightDir,
-    vec3 viewDir) {
-    float cosa = dot(lightDir, normal);
-    float cosb = dot(viewDir, normal);  
-    
-    return
-        vec3(0.6, 0.6, 0.2) / pi +
-        pow(clamp(dot(normalize(viewDir + lightDir), normal), 0.0, 1.0), 10.0 * 128.0) * vec3(1.0, 1.0, 1.0) / max(cosa, cosb)
-        ;
-}
-
-vec3 shade(
-    vec3 powerDensity,
-    vec3 normal,
-    vec3 lightDir,
-    vec3 viewDir) {
-
-    float cosa = clamp(dot(lightDir, normal), 0.0, 1.0);
-    return powerDensity * cosa * brdf(normal, lightDir, viewDir);
-}
 
 float linearizeDepth(float depth)
 {
@@ -80,19 +50,6 @@ float linearizeDepth(float depth)
 // 	return shadowFactor / count;
 // }
 
-vec3 iterateLights(vec3 worldPosition, vec3 normal)
-{
-    vec3 viewDir = normalize(camera.position.xyz - worldPosition);
-    vec3 radiance = vec3(0.0);
-    for (int i = 0; i < sceneLights.count; i++)
-    {
-        vec3 lightDiff = sceneLights.lights[i].position.xyz - worldPosition;
-        vec3 lightDir = normalize(lightDiff);
-        float lightDist2 = dot(lightDiff, lightDiff);
-        radiance += shade(sceneLights.lights[i].colorIntensity.xyz / lightDist2, normal, lightDir, viewDir);
-    }
-    return radiance;
-}
 
 void main() {
     vec3 normal = normalize(worldNormal.xyz);

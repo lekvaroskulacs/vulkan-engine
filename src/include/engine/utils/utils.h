@@ -73,7 +73,8 @@ struct QueueFamilyIndices
         int i = 0;
         for(const auto& queueFamily : queueFamilies)
         {
-            if(queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
+            if((queueFamily.queueFlags & vk::QueueFlagBits::eGraphics) && 
+               (queueFamily.queueFlags & vk::QueueFlagBits::eCompute))
             {
                 indices.m_graphicsFamily = i;
             }
