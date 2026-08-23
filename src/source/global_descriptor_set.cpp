@@ -15,6 +15,9 @@ GlobalDescriptorSet::GlobalDescriptorSet(std::shared_ptr<Device> device)
 {
     m_camera = std::make_unique<UniformCamera>(m_device);
     m_lights = std::make_unique<LightBuffer>(m_device);
+    m_clusterBounds = std::make_unique<ClusterBoundsBuffer>(m_device);
+    m_lightGrid = std::make_unique<LightGridBuffer>(m_device);
+    m_lightIndices = std::make_unique<LightIndexBuffer>(m_device);
 
     createDescriptorSetLayout();
     createDescriptorPool();
@@ -65,19 +68,40 @@ void GlobalDescriptorSet::updateLights(uint32_t frameIndex, const std::vector<Li
 // right now you need to add code in 3 different functions
 void GlobalDescriptorSet::createDescriptorSetLayout()
 {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+    std::array<vk::DescriptorSetLayoutBinding, 5> bindings{
         vk::DescriptorSetLayoutBinding{
             .binding = 0,
             .descriptorType = vk::DescriptorType::eUniformBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute,
             .pImmutableSamplers = nullptr,
         },
         vk::DescriptorSetLayoutBinding{
             .binding = 1,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute,
+            .pImmutableSamplers = nullptr,
+        },
+        vk::DescriptorSetLayoutBinding{
+            .binding = 2,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+            .pImmutableSamplers = nullptr,
+        },
+        vk::DescriptorSetLayoutBinding{
+            .binding = 3,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr,
+        },
+        vk::DescriptorSetLayoutBinding{
+            .binding = 4,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment,
             .pImmutableSamplers = nullptr,
         },
     };
@@ -97,7 +121,7 @@ void GlobalDescriptorSet::createDescriptorPool()
 {
     std::array<vk::DescriptorPoolSize, 2> poolSizes{
         vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, MAX_FRAMES_IN_FLIGHT},
-        vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, MAX_FRAMES_IN_FLIGHT},
+        vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, MAX_FRAMES_IN_FLIGHT * 4},
     };
 
     vk::DescriptorPoolCreateInfo poolInfo{
@@ -139,8 +163,23 @@ void GlobalDescriptorSet::createDescriptorSets()
             .offset = 0,
             .range = m_lights->getBufferSize(),
         };
+        vk::DescriptorBufferInfo clusterBufferInfo{
+            .buffer = m_clusterBounds->m_buffers[i],
+            .offset = 0,
+            .range = m_clusterBounds->getBufferSize(),
+        };
+        vk::DescriptorBufferInfo lightGridInfo{
+            .buffer = m_lightGrid->m_buffers[i],
+            .offset = 0,
+            .range = m_lightGrid->getBufferSize(),
+        };
+        vk::DescriptorBufferInfo lightIndicesInfo{
+            .buffer = m_lightIndices->m_buffers[i],
+            .offset = 0,
+            .range = m_lightIndices->getBufferSize(),
+        };
 
-        std::array<vk::WriteDescriptorSet, 2> writes{
+        std::array<vk::WriteDescriptorSet, 5> writes{
             vk::WriteDescriptorSet{
                 .dstSet = m_descriptorSets[i],
                 .dstBinding = 0,
@@ -156,6 +195,30 @@ void GlobalDescriptorSet::createDescriptorSets()
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eStorageBuffer,
                 .pBufferInfo = &lightsBufferInfo,
+            },
+            vk::WriteDescriptorSet{
+                .dstSet = m_descriptorSets[i],
+                .dstBinding = 2,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eStorageBuffer,
+                .pBufferInfo = &clusterBufferInfo,
+            },
+            vk::WriteDescriptorSet{
+                .dstSet = m_descriptorSets[i],
+                .dstBinding = 3,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eStorageBuffer,
+                .pBufferInfo = &lightGridInfo,
+            },
+            vk::WriteDescriptorSet{
+                .dstSet = m_descriptorSets[i],
+                .dstBinding = 4,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eStorageBuffer,
+                .pBufferInfo = &lightIndicesInfo,
             },
         };
 
