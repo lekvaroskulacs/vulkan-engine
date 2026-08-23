@@ -1,5 +1,5 @@
 #pragma once
-#include <engine/uniforms/uniforms.h>
+#include <engine/buffers/compute_buffer.h>
 
 namespace engine {
 
@@ -9,9 +9,7 @@ struct Light
     alignas(16) glm::vec4 colorIntensity;
 };
 
-// TODO: probably there should be an extra step in the hierarchy for StorageBuffer 
-// when needed and light should inherit that
-class LightBuffer : public ConcreteBuffer
+class LightBuffer : public ComputeBuffer
 {
 public:
     static constexpr uint32_t MAX_LIGHTS = 64;
@@ -23,7 +21,7 @@ public:
     };
 
     explicit LightBuffer(std::shared_ptr<Device> device)
-        : ConcreteBuffer(device, sizeof(LightBufferObject), vk::BufferUsageFlagBits::eStorageBuffer)
+        : ComputeBuffer(device, sizeof(LightBufferObject))
     {
         m_bufferSize = sizeof(LightBufferObject);
     }

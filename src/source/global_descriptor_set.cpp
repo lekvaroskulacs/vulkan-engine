@@ -46,6 +46,9 @@ void GlobalDescriptorSet::updateCamera(uint32_t frameIndex, const Camera& camera
     rayDir = glm::inverse(camera.m_proj * camera.m_view * rayDir);
     ubo.rayDir = rayDir;
     ubo.position = glm::vec4(camera.m_cameraPos, 1.0f);
+    ubo.view = camera.m_view;
+    ubo.proj = camera.m_proj;
+    ubo.nearFar = glm::vec4(Camera::zNear, Camera::zFar, 0.0f, 0.0f);
     m_camera->updateBuffer(&ubo, frameIndex);
 }
 

@@ -60,7 +60,7 @@ VkDescriptorSetLayout Pipeline::GetDescriptorSetLayout()
 
 VkPipeline Pipeline::Get() const
 {
-    return m_graphicsPipeline;
+    return m_pipeline;
 }
 
 VkPipelineLayout Pipeline::GetLayout() const
@@ -89,18 +89,23 @@ Pipeline::Pipeline(std::shared_ptr<Device> device, std::shared_ptr<RenderPass> r
     createDescriptorSets(params.m_resources);
 }
 
+Pipeline::Pipeline(std::shared_ptr<Device> device, const CreatePipelineParams& params)
+    : Pipeline(device, nullptr, params)
+{
+}
+
 Pipeline::~Pipeline()
 {
     m_device->GetDevice().destroyDescriptorPool(m_descriptorPool, nullptr);
     m_device->GetDevice().destroyDescriptorSetLayout(m_descriptorSetLayout, nullptr);
-    m_device->GetDevice().destroyPipeline(m_graphicsPipeline, nullptr);
+    m_device->GetDevice().destroyPipeline(m_pipeline, nullptr);
     m_device->GetDevice().destroyPipelineLayout(m_pipelineLayout, nullptr);
 }
 
 void Pipeline::recreatePipeline()
 {
     m_device->GetDevice().waitIdle();
-    m_device->GetDevice().destroyPipeline(m_graphicsPipeline, nullptr);
+    m_device->GetDevice().destroyPipeline(m_pipeline, nullptr);
     m_device->GetDevice().destroyPipelineLayout(m_pipelineLayout, nullptr);
     createPipeline(m_recreationParams);
 }
@@ -110,14 +115,15 @@ void Pipeline::createDescriptorSetLayout(const std::unordered_map<uint8_t, Pipel
     std::vector<vk::DescriptorSetLayoutBinding> layoutBindings;
     for(auto& [binding, resource] : resources)
     {
-        if(std::holds_alternative<Uniform*>(resource.m_resource))
+        if(std::holds_alternative<ConcreteBuffer*>(resource.m_resource))
         {
-            vk::DescriptorSetLayoutBinding uboLayoutBinding{.binding = binding,
-                                                            .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                                            .descriptorCount = 1,
-                                                            .stageFlags = resource.m_stage,
-                                                            .pImmutableSamplers = nullptr};
-            layoutBindings.push_back(uboLayoutBinding);
+            auto* buffer = std::get<ConcreteBuffer*>(resource.m_resource);
+            vk::DescriptorSetLayoutBinding bufferLayoutBinding{.binding = binding,
+                                                               .descriptorType = buffer->GetDescriptorType(),
+                                                               .descriptorCount = 1,
+                                                               .stageFlags = resource.m_stage,
+                                                               .pImmutableSamplers = nullptr};
+            layoutBindings.push_back(bufferLayoutBinding);
         }
         else if(std::holds_alternative<Texture*>(resource.m_resource))
         {
@@ -173,12 +179,21 @@ vk::ShaderModule Pipeline::createShaderModule(const std::string& code, shaderc_s
 void Pipeline::createDescriptorPool(const std::unordered_map<uint8_t, PipelineResource>& resources)
 {
     uint32_t uniformCount = 0;
+    uint32_t storageCount = 0;
     uint32_t textureCount = 0;
     for(auto& [_, resource] : resources)
     {
-        if(std::holds_alternative<Uniform*>(resource.m_resource))
+        if(std::holds_alternative<ConcreteBuffer*>(resource.m_resource))
         {
-            ++uniformCount;
+            auto* buffer = std::get<ConcreteBuffer*>(resource.m_resource);
+            if(buffer->GetDescriptorType() == vk::DescriptorType::eStorageBuffer)
+            {
+                ++storageCount;
+            }
+            else
+            {
+                ++uniformCount;
+            }
         }
         else if(std::holds_alternative<Texture*>(resource.m_resource))
         {
@@ -191,6 +206,10 @@ void Pipeline::createDescriptorPool(const std::unordered_map<uint8_t, PipelineRe
     if(uniformCount > 0)
     {
         poolSizes.push_back({vk::DescriptorType::eUniformBuffer, MAX_FRAMES_IN_FLIGHT * uniformCount});
+    }
+    if(storageCount > 0)
+    {
+        poolSizes.push_back({vk::DescriptorType::eStorageBuffer, MAX_FRAMES_IN_FLIGHT * storageCount});
     }
     if(textureCount > 0)
     {
@@ -243,16 +262,16 @@ void Pipeline::createDescriptorSets(const std::unordered_map<uint8_t, PipelineRe
             descriptorWrites[writesPos].dstArrayElement = 0;
             descriptorWrites[writesPos].descriptorCount = 1;
 
-            if(std::holds_alternative<Uniform*>(resource.m_resource))
+            if(std::holds_alternative<ConcreteBuffer*>(resource.m_resource))
             {
-                auto& uniform = std::get<Uniform*>(resource.m_resource);
+                auto& buffer = std::get<ConcreteBuffer*>(resource.m_resource);
                 bufferInfos.push_back({
-                    .buffer = uniform->m_buffers[i],
+                    .buffer = buffer->m_buffers[i],
                     .offset = 0,
-                    .range = uniform->getBufferSize(),
+                    .range = buffer->getBufferSize(),
                 });
 
-                descriptorWrites[writesPos].descriptorType = vk::DescriptorType::eUniformBuffer;
+                descriptorWrites[writesPos].descriptorType = buffer->GetDescriptorType();
                 descriptorWrites[writesPos].pBufferInfo = &bufferInfos.back();
             }
             else if(std::holds_alternative<Texture*>(resource.m_resource))

@@ -127,7 +127,7 @@ void PipelineShadowMap::createPipeline(const ShaderCodePaths& paths)
         .basePipelineIndex = -1,
     };
 
-    if(m_device->GetDevice().createGraphicsPipelines({}, 1, &pipelineInfo, nullptr, &m_graphicsPipeline) != vk::Result::eSuccess)
+    if(m_device->GetDevice().createGraphicsPipelines({}, 1, &pipelineInfo, nullptr, &m_pipeline) != vk::Result::eSuccess)
     {
         throw std::runtime_error("failed to create graphics pipeline!");
     }

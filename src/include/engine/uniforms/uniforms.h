@@ -37,6 +37,14 @@ public:
         m_device->copyMemoryToAllocation(data, m_bufferAllocations[currentImage], m_bufferSize);
     }
 
+    /// What kind of descriptor this buffer should be bound as (drives Pipeline's descriptor
+    /// set layout/pool/write setup), inferred from the usage flags it was created with.
+    vk::DescriptorType GetDescriptorType() const
+    {
+        return (m_usage & vk::BufferUsageFlagBits::eStorageBuffer) ? vk::DescriptorType::eStorageBuffer
+                                                                    : vk::DescriptorType::eUniformBuffer;
+    }
+
     std::vector<vk::Buffer> m_buffers;
     std::vector<VmaAllocation> m_bufferAllocations;
 
@@ -45,6 +53,7 @@ protected:
                             vk::DeviceSize bufferSize,
                             vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eUniformBuffer)
         : m_device{device}
+        , m_usage{usage}
     {
         m_buffers.resize(MAX_FRAMES_IN_FLIGHT);
         m_bufferAllocations.resize(MAX_FRAMES_IN_FLIGHT);
@@ -61,6 +70,7 @@ protected:
 
     std::shared_ptr<Device> m_device;
     vk::DeviceSize m_bufferSize;
+    vk::BufferUsageFlags m_usage;
 };
 
 class Uniform : public ConcreteBuffer
@@ -96,6 +106,9 @@ public:
     {
         alignas(16) glm::mat4 rayDir;
         alignas(16) glm::vec4 position;
+        alignas(16) glm::mat4 view;
+        alignas(16) glm::mat4 proj;
+        alignas(16) glm::vec4 nearFar; // x = near, y = far
     };
 
     explicit UniformCamera(std::shared_ptr<Device> device)

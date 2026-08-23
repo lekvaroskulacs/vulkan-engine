@@ -14,7 +14,7 @@
 namespace engine
 {
 
-using Resource = std::variant<Uniform*, Texture*>;
+using Resource = std::variant<ConcreteBuffer*, Texture*>;
 struct PipelineResource
 {
     vk::ShaderStageFlags m_stage;
@@ -25,6 +25,7 @@ struct ShaderCodePaths
 {
     std::string m_vertexShaderPath;
     std::string m_fragmentShaderPath;
+    std::string m_computeShaderPath;
 };
 
 struct CreatePipelineParams
@@ -43,6 +44,8 @@ public:
     std::vector<vk::DescriptorSet> GetDescriptorSets() const;
 
     explicit Pipeline(std::shared_ptr<Device> device, std::shared_ptr<RenderPass> renderPass, const CreatePipelineParams& params);
+    /// For pipelines with no render pass (compute).
+    explicit Pipeline(std::shared_ptr<Device> device, const CreatePipelineParams& params);
     virtual ~Pipeline();
 
     void recreatePipeline();
@@ -65,7 +68,7 @@ protected:
 
     vk::DescriptorSetLayout m_descriptorSetLayout;
     vk::PipelineLayout m_pipelineLayout;
-    vk::Pipeline m_graphicsPipeline;
+    vk::Pipeline m_pipeline;
 };
 
 } // namespace engine

@@ -34,6 +34,7 @@ private:
     std::shared_ptr<Device> m_device;
     std::unique_ptr<UniformCamera> m_camera; // binding 0
     std::unique_ptr<LightBuffer> m_lights;   // binding 1
+    std::unique_ptr<
 
     vk::DescriptorSetLayout m_descriptorSetLayout;
     vk::DescriptorPool m_descriptorPool;
