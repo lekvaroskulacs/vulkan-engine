@@ -8,14 +8,17 @@
 
 #include <vulkan/vulkan.hpp>
 
+#include <string>
+
 namespace engine
 {
 
 struct UserInterfaceObjectReferences
 {
-    std::vector<std::reference_wrapper<Pipeline>> m_pipelines;
+    std::unordered_map<std::string, Pipeline*> m_pipelines;
     glm::vec3* m_light_pos;
     glm::vec3* m_light_facing;
+    std::vector<Light>* m_lights;
 };
 
 class UserInterface
@@ -70,30 +73,68 @@ public:
         ImGuiIO& io = ImGui::GetIO();
 
         {
-            static float f = 0.0f;
-            static int counter = 0;
+            constexpr ImGuiTreeNodeFlags openByDefault = ImGuiTreeNodeFlags_DefaultOpen;
 
-            ImGui::Begin("Controls");
+            ImGui::Begin("Menu");
 
-            if(ImGui::Button("Reload Shaders"))
+            if(ImGui::CollapsingHeader("Shaders", openByDefault))
             {
-                for(engine::Pipeline& pipeline : refs.m_pipelines)
+                if(ImGui::Button("Reload Shaders"))
                 {
-                    pipeline.recreatePipeline();
+                    for(auto& [_, pipeline] : refs.m_pipelines)
+                    {
+                        pipeline->recreatePipeline();
+                    }
                 }
             }
 
-            if(ImGui::SliderFloat3("Light position", &refs.m_light_pos->x, -4.0f, 4.0f))
+            if(ImGui::CollapsingHeader("Lighting", openByDefault))
             {
-                // if value changed
+                if(ImGui::SliderFloat3("Light position", &refs.m_light_pos->x, -4.0f, 4.0f))
+                {
+                    // if value changed
+                }
+
+                // if(ImGui::SliderFloat3("Light target point", &refs.m_light_facing->x, -4.0f, 4.0f))
+                // {
+                //     // if value changed
+                // }
+
+                int lightId = 0;
+                for(auto& light : *refs.m_lights)
+                {
+                    std::string label = "Light " + std::to_string(lightId++);
+                    if(ImGui::SliderFloat3(label.c_str(), &light.position.x, -4.0f, 4.0f))
+                    {
+                        ;
+                    }
+                }
             }
 
-            // if(ImGui::SliderFloat3("Light target point", &refs.m_light_facing->x, -4.0f, 4.0f))
-            // {
-            //     // if value changed
-            // }
+            if(ImGui::CollapsingHeader("Debug", openByDefault))
+            {
+                static bool displayClusters = false;
+                if(ImGui::Checkbox("Display clusters", &displayClusters))
+                {
+                    ShaderCodePaths shaders{.m_vertexShaderPath = "shaders/transform.vert"};
+                    if (displayClusters)
+                    {
+                        shaders.m_fragmentShaderPath = "shaders/compute/debug_cluster.frag";
+                    }
+                    else
+                    {
+                        shaders.m_fragmentShaderPath = "shaders/omni_shadow.frag";
+                    }
+                    auto interior = refs.m_pipelines.at("interior");
+                    interior->changeShadersRuntime(shaders);
+                }
+            }
 
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            if(ImGui::CollapsingHeader("Stats", openByDefault))
+            {
+                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            }
+
             ImGui::End();
         }
     }

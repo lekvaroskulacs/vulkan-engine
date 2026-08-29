@@ -1,6 +1,7 @@
 #pragma once
 
 #include <engine/pipeline/pipeline.h>
+#include <engine/pipeline/compute_pipeline.h>
 #include <engine/renderpass/render_pass.h>
 #include <engine/camera/camera.h>
 #include <engine/command_buffer/command_buffer.h>
@@ -13,7 +14,7 @@ namespace engine
 {
 
 /// Data per draw call
-struct DrawFrameData
+struct PerMeshRenderData
 {
     struct PerRenderPassParams
     {
@@ -31,6 +32,12 @@ struct DrawFrameData
     glm::vec3 m_shadow_light_position;
 };
 
+struct DrawFrameData
+{
+    std::vector<PipelineCompute*> m_frameBeginComputeSteps;
+    std::vector<PerMeshRenderData> m_renderData;
+};
+
 class Renderer
 {
 public:
@@ -45,10 +52,10 @@ public:
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 
-    void recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex, const std::vector<DrawFrameData>& params_list);
+    void recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex, const DrawFrameData& data);
 
-    void drawFrame(const std::vector<DrawFrameData>& params_list);
-    void updateUniformBuffers(uint32_t currentImage, const DrawFrameData& params_list);
+    void drawFrame(const DrawFrameData& data);
+    void updateUniformBuffers(uint32_t currentImage, const PerMeshRenderData& params_list);
 
     uint32_t GetCurrentFrame() const
     {

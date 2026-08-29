@@ -76,6 +76,13 @@ public:
             m_device, m_swapChain, m_renderPasses, m_commandBuffer, m_camera, m_ui, m_globalSet);
         m_window->SetResizeCallback(engine::Renderer::framebufferResizeCallback);
 
+        auto clusterParams = engine::CreatePipelineParams{
+            .m_shaderPaths = {
+                .m_computeShaderPath = "shaders/compute/cluster_build.comp"
+            }
+        }; 
+        m_buildClustersPipeline = std::make_unique<engine::PipelineCompute>(m_device, clusterParams, m_globalSet->GetLayout());
+
 
         engine::Texture2DParams vikingTexParams{.m_filepath = "textures/viking_room.png"};
         engine::TextureCubeParams env_params{.m_filepaths = {
@@ -183,6 +190,9 @@ private:
     std::shared_ptr<engine::UserInterface> m_ui;
     std::shared_ptr<engine::GlobalDescriptorSet> m_globalSet;
 
+    std::unique_ptr<engine::PipelineCompute> m_buildClustersPipeline;
+    std::unique_ptr<engine::PipelineCompute> m_cullLightsPipeline;
+
     std::shared_ptr<engine::Camera> m_camera;
 
     std::unique_ptr<engine::GameObject> m_testInterior;
@@ -208,19 +218,32 @@ private:
             m_camera->processInput(m_window->Get(), time);
 
             engine::UserInterfaceObjectReferences refs{};
-            refs.m_pipelines = {m_testInterior->GetPipeline(), m_skybox->GetPipeline(), m_testInterior->GetShadowPipeline()};
+            refs.m_pipelines = {
+                {"interior", &m_testInterior->GetPipeline()}, 
+                {"skybox", &m_skybox->GetPipeline()}, 
+                {"shadow", &m_testInterior->GetShadowPipeline()},
+                {"clusterCompute", m_buildClustersPipeline.get()},
+                {"cullLightsCompute", m_cullLightsPipeline.get()}
+            };
             refs.m_light_pos = &m_light_pos;
             refs.m_light_facing = &m_light_facing;
+            refs.m_lights = &m_lights;
             m_ui->buildInterface(refs);
 
             m_globalSet->updateCamera(m_renderer->GetCurrentFrame(), *m_camera);
             m_globalSet->updateLights(m_renderer->GetCurrentFrame(), m_lights);
 
-            std::vector<engine::DrawFrameData> params_list;
+            std::vector<engine::PerMeshRenderData> params_list;
             params_list.push_back(m_skybox->getDrawFrameParams());
             params_list.push_back(m_testInterior->getDrawFrameParams());
             params_list.push_back(m_skull->getDrawFrameParams());
-            m_renderer->drawFrame(params_list);
+
+            engine::DrawFrameData data
+            {
+                .m_frameBeginComputeSteps = {m_buildClustersPipeline.get(), m_cullLightsPipeline.get()},
+                .m_renderData = params_list,
+            };
+            m_renderer->drawFrame(data);
         }
 
         vkDeviceWaitIdle(m_device->GetDevice());

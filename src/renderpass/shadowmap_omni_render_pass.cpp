@@ -36,7 +36,7 @@ Texture* OmniShadowMapRenderPass::GetRenderTarget(uint32_t index) const
     return m_renderTargets.at(index).get();
 }
 
-std::optional<PushConstantData> OmniShadowMapRenderPass::GetPushConstants(uint32_t instance, const DrawFrameData& frame) const
+std::optional<PushConstantData> OmniShadowMapRenderPass::GetPushConstants(uint32_t instance, const PerMeshRenderData& frame) const
 {
     auto lightPos = frame.m_shadow_light_position;
     glm::mat4 viewMatrix = glm::mat4(1.0f);

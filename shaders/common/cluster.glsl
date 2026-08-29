@@ -26,17 +26,23 @@ struct LightPerClusterProperties
     uint count;
 };
 
-layout(set = 0, binding = 2) buffer ClusterBounds
+// Define readonly if the buffers are read in a shader:
+// #define CLUSTER_BUFFER_QUALIFIER readonly
+#ifndef CLUSTER_BUFFER_QUALIFIER
+#define CLUSTER_BUFFER_QUALIFIER
+#endif
+
+layout(set = 0, binding = 2) CLUSTER_BUFFER_QUALIFIER buffer ClusterBounds
 {
     AABB aabb[numClusters];
 } clusterBounds;
 
-layout(set = 0, binding = 3) buffer LightGrid
+layout(set = 0, binding = 3) CLUSTER_BUFFER_QUALIFIER buffer LightGrid
 {
     LightPerClusterProperties lightsPerCluster[numClusters];
 } lightGrid;
 
-layout(set = 0, binding = 4) buffer LightIndices
+layout(set = 0, binding = 4) CLUSTER_BUFFER_QUALIFIER buffer LightIndices
 {
     uint currentIdx;
     uint indices[numClusters * avgLights];

@@ -110,6 +110,12 @@ void Pipeline::recreatePipeline()
     createPipeline(m_recreationParams);
 }
 
+void Pipeline::changeShadersRuntime(const ShaderCodePaths& shaders)
+{
+    m_recreationParams = shaders;
+    recreatePipeline();
+}
+
 void Pipeline::createDescriptorSetLayout(const std::unordered_map<uint8_t, PipelineResource>& resources)
 {
     std::vector<vk::DescriptorSetLayoutBinding> layoutBindings;

@@ -15,7 +15,7 @@ protected:
     }
 };
 
-namespace {
+namespace cluster {
 constexpr uint32_t gridX = 16;
 constexpr uint32_t gridY = 9;
 constexpr uint32_t numSlices = 24;
@@ -28,7 +28,7 @@ class ClusterBoundsBuffer : public ComputeBuffer
 public:
     struct SSBO
     {
-        utils::AABB m_aabb[gridX * gridY * numSlices];
+        utils::AABB m_aabb[cluster::gridX * cluster::gridY * cluster::numSlices];
     };
 
     explicit ClusterBoundsBuffer(std::shared_ptr<Device> device)
@@ -49,7 +49,7 @@ class LightGridBuffer : public ComputeBuffer
 public:
     struct SSBO
     {
-        LightPerClusterProperties m_lightsPerCluster[gridX * gridY * numSlices];
+        LightPerClusterProperties m_lightsPerCluster[cluster::gridX * cluster::gridY * cluster::numSlices];
     };
 
     explicit LightGridBuffer(std::shared_ptr<Device> device)
@@ -65,7 +65,7 @@ public:
     struct SSBO
     {
         uint32_t m_currentIndex = 0;
-        uint32_t m_indices[gridX * gridY * numSlices * avgLights];
+        uint32_t m_indices[cluster::gridX * cluster::gridY * cluster::numSlices * cluster::avgLights];
     };
 
     explicit LightIndexBuffer(std::shared_ptr<Device> device)

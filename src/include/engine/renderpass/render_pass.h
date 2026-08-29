@@ -12,7 +12,7 @@
 namespace engine
 {
 
-struct DrawFrameData;
+struct PerMeshRenderData;
 
 enum class RenderPassStage
 {
@@ -37,7 +37,7 @@ public:
     virtual vk::Framebuffer GetFrameBuffer(uint32_t instance, uint32_t imageIndex) const = 0;
     virtual std::vector<vk::ClearValue> GetClearValues() const = 0;
     virtual Texture* GetRenderTarget(uint32_t index = 0) const;
-    virtual std::optional<PushConstantData> GetPushConstants(uint32_t instance, const DrawFrameData& frame) const;
+    virtual std::optional<PushConstantData> GetPushConstants(uint32_t instance, const PerMeshRenderData& frame) const;
 
     explicit RenderPass(std::shared_ptr<Device> device);
     virtual ~RenderPass();

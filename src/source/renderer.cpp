@@ -47,7 +47,7 @@ void Renderer::framebufferResizeCallback(GLFWwindow* window, int width, int heig
     app->m_framebufferResized = true;
 }
 
-void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex, const std::vector<DrawFrameData>& params_list)
+void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex, const DrawFrameData& data)
 {
     vk::CommandBufferBeginInfo beginInfo{
         .flags = {},
@@ -57,6 +57,23 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
     {
         throw std::runtime_error("Failed to begin recording command buffer");
     }
+
+    auto& buildClusterPipeline = data.m_frameBeginComputeSteps[0];
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, buildClusterPipeline->Get());
+    vk::DescriptorSet globalSet = m_globalDescriptorSet->GetDescriptorSet(m_currentFrame);
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, buildClusterPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
+    commandBuffer.dispatch(cluster::gridX, cluster::gridY, cluster::numSlices);
+
+    vk::MemoryBarrier clusterBuildBarrier{
+        .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+        .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+    };
+    commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                  vk::PipelineStageFlagBits::eFragmentShader,
+                                  {},
+                                  1, &clusterBuildBarrier,
+                                  0, nullptr,
+                                  0, nullptr);
 
     for(auto& [stage, pass] : m_renderPasses)
     {
@@ -76,7 +93,7 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
 
             bool globalSetBound = false;
 
-            for(const auto& drawable : params_list)
+            for(const auto& drawable : data.m_renderData)
             {
                 if(drawable.m_renderPassInfo.find(stage) == drawable.m_renderPassInfo.end())
                 {
@@ -98,7 +115,6 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
 
                 if(stage == RenderPassStage::General && !globalSetBound)
                 {
-                    vk::DescriptorSet globalSet = m_globalDescriptorSet->GetDescriptorSet(m_currentFrame);
                     commandBuffer.bindDescriptorSets(
                         vk::PipelineBindPoint::eGraphics, params.m_pipeline.GetLayout(), 0, 1, &globalSet, 0, nullptr);
                     globalSetBound = true;
@@ -149,7 +165,7 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
     commandBuffer.end();
 }
 
-void Renderer::drawFrame(const std::vector<DrawFrameData>& params_list)
+void Renderer::drawFrame(const DrawFrameData& data)
 {
     [[maybe_unused]] auto ignored = m_device->GetDevice().waitForFences(1, &m_inFlightFences[m_currentFrame], vk::True, UINT64_MAX);
     uint32_t imageIndex;
@@ -168,8 +184,8 @@ void Renderer::drawFrame(const std::vector<DrawFrameData>& params_list)
     ignored = m_device->GetDevice().resetFences(1, &m_inFlightFences[m_currentFrame]);
     m_commandBuffers->GetBuffers()[m_currentFrame].reset();
 
-    recordCommandBuffer(m_commandBuffers->GetBuffers()[m_currentFrame], imageIndex, params_list);
-    for(auto& params : params_list)
+    recordCommandBuffer(m_commandBuffers->GetBuffers()[m_currentFrame], imageIndex, data);
+    for(auto& params : data.m_renderData)
     {
         updateUniformBuffers(m_currentFrame, params);
     }
@@ -217,7 +233,7 @@ void Renderer::drawFrame(const std::vector<DrawFrameData>& params_list)
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void Renderer::updateUniformBuffers(uint32_t currentImage, const DrawFrameData& params_list)
+void Renderer::updateUniformBuffers(uint32_t currentImage, const PerMeshRenderData& params_list)
 {
     for(auto& [_, perPass] : params_list.m_renderPassInfo)
     {

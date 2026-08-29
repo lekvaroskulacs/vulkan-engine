@@ -19,7 +19,7 @@ Texture* RenderPass::GetRenderTarget(uint32_t index) const
     throw std::runtime_error("This render pass doesn't expose a sampleable render target!");
 }
 
-std::optional<PushConstantData> RenderPass::GetPushConstants(uint32_t instance, const DrawFrameData& frame) const
+std::optional<PushConstantData> RenderPass::GetPushConstants(uint32_t instance, const PerMeshRenderData& frame) const
 {
     return std::nullopt;
 }

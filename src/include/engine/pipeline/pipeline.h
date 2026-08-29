@@ -49,6 +49,7 @@ public:
     virtual ~Pipeline();
 
     void recreatePipeline();
+    void changeShadersRuntime(const ShaderCodePaths& shaders);
 
 protected:
     void createDescriptorSetLayout(const std::unordered_map<uint8_t, PipelineResource>& resources);

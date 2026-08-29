@@ -14,7 +14,7 @@ public:
     vk::Framebuffer GetFrameBuffer(uint32_t instance, uint32_t imageIndex) const override;
     std::vector<vk::ClearValue> GetClearValues() const override;
     Texture* GetRenderTarget(uint32_t index = 0) const override;
-    std::optional<PushConstantData> GetPushConstants(uint32_t instance, const DrawFrameData& frame) const override;
+    std::optional<PushConstantData> GetPushConstants(uint32_t instance, const PerMeshRenderData& frame) const override;
 
     explicit OmniShadowMapRenderPass(std::shared_ptr<Device> device, std::shared_ptr<CommandBuffer> commandBuffer);
     ~OmniShadowMapRenderPass() override;

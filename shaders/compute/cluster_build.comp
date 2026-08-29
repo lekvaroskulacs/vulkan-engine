@@ -5,7 +5,51 @@
 
 layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
+// A point along the ray from the eye (view-space origin) through this NDC
+// coordinate. The z we feed in is a free parameter - it just needs to avoid a
+// degenerate w - since we only keep the ray's direction and re-derive the
+// actual depth ourselves in lineIntersectionToZPlane below.
+vec3 screenToView(vec2 ndc)
+{
+    vec4 view = inverse(camera.proj) * vec4(ndc, -1.0, 1.0);
+    return view.xyz / view.w;
+}
+
+// Where the ray from the origin through viewSpaceDir crosses the plane z = targetZ.
+// Both are negative here: the camera looks down -Z in view space.
+vec3 lineIntersectionToZPlane(vec3 viewSpaceDir, float targetZ)
+{
+    float t = targetZ / viewSpaceDir.z;
+    return t * viewSpaceDir;
+}
+
 void main()
 {
+    uvec3 clusterID = gl_WorkGroupID;
 
+    // This cluster's screen-space tile, in NDC ([-1, 1]) so it's resolution independent.
+    vec2 ndcMin = vec2(clusterID.xy)      / vec2(gridX, gridY) * 2.0 - 1.0;
+    vec2 ndcMax = vec2(clusterID.xy + 1u) / vec2(gridX, gridY) * 2.0 - 1.0;
+
+    vec3 minDir = screenToView(ndcMin); //bal alsó sarokból
+    vec3 maxDir = screenToView(ndcMax); //jobb felső sarokból
+
+    // Exponential Z slicing (Doom 2016-style): near slices get a much thinner
+    // depth range than far ones, matching where clustered shading actually helps.
+    float near = camera.nearFar.x;
+    float far = camera.nearFar.y;
+    float sliceNear = near * pow(far / near, float(clusterID.z) / float(numSlices));
+    float sliceFar = near * pow(far / near, float(clusterID.z + 1u) / float(numSlices));
+
+    vec3 minNear = lineIntersectionToZPlane(minDir, -sliceNear);
+    vec3 minFar = lineIntersectionToZPlane(minDir, -sliceFar);
+    vec3 maxNear = lineIntersectionToZPlane(maxDir, -sliceNear);
+    vec3 maxFar = lineIntersectionToZPlane(maxDir, -sliceFar);
+
+    vec3 aabbMin = min(min(minNear, minFar), min(maxNear, maxFar));
+    vec3 aabbMax = max(max(minNear, minFar), max(maxNear, maxFar));
+
+    uint index = clusterIndex(clusterID);
+    clusterBounds.aabb[index].min = vec4(aabbMin, 1.0);
+    clusterBounds.aabb[index].max = vec4(aabbMax, 1.0);
 }
