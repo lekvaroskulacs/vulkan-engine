@@ -57,10 +57,11 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
     {
         throw std::runtime_error("Failed to begin recording command buffer");
     }
+    
+    vk::DescriptorSet globalSet = m_globalDescriptorSet->GetDescriptorSet(m_currentFrame);
 
     auto& buildClusterPipeline = data.m_frameBeginComputeSteps[0];
     commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, buildClusterPipeline->Get());
-    vk::DescriptorSet globalSet = m_globalDescriptorSet->GetDescriptorSet(m_currentFrame);
     commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, buildClusterPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
     commandBuffer.dispatch(cluster::gridX, cluster::gridY, cluster::numSlices);
 
@@ -68,6 +69,32 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
         .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
         .dstAccessMask = vk::AccessFlagBits::eShaderRead,
     };
+    commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                  vk::PipelineStageFlagBits::eComputeShader,
+                                  {},
+                                  1, &clusterBuildBarrier,
+                                  0, nullptr,
+                                  0, nullptr);
+
+    
+    commandBuffer.fillBuffer(m_globalDescriptorSet->GetLightIndexBuffer(m_currentFrame), 0, sizeof(uint32_t), 0);
+
+    vk::MemoryBarrier lightIndexResetBarrier{
+        .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+        .dstAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
+    };
+    commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                  vk::PipelineStageFlagBits::eComputeShader,
+                                  {},
+                                  1, &lightIndexResetBarrier,
+                                  0, nullptr,
+                                  0, nullptr);
+
+    auto& cullLightsPipeline = data.m_frameBeginComputeSteps[1];
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, cullLightsPipeline->Get());
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, cullLightsPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
+    commandBuffer.dispatch(cluster::gridX, cluster::gridY, 1);
+
     commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                                   vk::PipelineStageFlagBits::eFragmentShader,
                                   {},
@@ -244,9 +271,16 @@ void Renderer::updateUniformBuffers(uint32_t currentImage, const PerMeshRenderDa
     }
 }
 
-void Renderer::recreateSwapChainResources()
+void Renderer::recreateSwapChainResources(std::optional<vk::PresentModeKHR> presentMode)
 {
-    m_swapChain->recreateSwapChain();
+    if(presentMode)
+    {
+        m_swapChain->recreateSwapChain(*presentMode);
+    }
+    else
+    {
+        m_swapChain->recreateSwapChain();
+    }
     for(auto& [stage, pass] : m_renderPasses)
     {
         pass->recreate();

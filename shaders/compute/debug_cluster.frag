@@ -11,11 +11,6 @@ layout(location = 0) out vec4 outColor;
 #define CLUSTER_BUFFER_QUALIFIER readonly
 #include "common/cluster.glsl"
 
-bool contains(AABB aabb, vec3 p)
-{
-    return all(greaterThanEqual(p, aabb.min.xyz)) && all(lessThanEqual(p, aabb.max.xyz));
-}
-
 void main()
 {
     vec3 viewPos = (camera.view * worldPos).xyz;

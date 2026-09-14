@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include <engine/pipeline/pipeline.h>
 #include <engine/pipeline/compute_pipeline.h>
 #include <engine/renderpass/render_pass.h>
@@ -62,9 +64,10 @@ public:
         return m_currentFrame;
     }
 
+    void recreateSwapChainResources(std::optional<vk::PresentModeKHR> presentMode = std::nullopt);
+
 private:
     void createSyncObjects();
-    void recreateSwapChainResources();
 
     std::shared_ptr<Device> m_device;
     std::shared_ptr<SwapChain> m_swapChain;

@@ -26,6 +26,8 @@ public:
     void updateCamera(uint32_t frameIndex, const Camera& camera);
     void updateLights(uint32_t frameIndex, const std::vector<Light>& lights);
 
+    vk::Buffer GetLightIndexBuffer(uint32_t frameIndex) const;
+
 private:
     void createDescriptorSetLayout();
     void createDescriptorPool();

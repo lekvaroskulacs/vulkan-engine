@@ -7,12 +7,13 @@ struct Light
 {
     alignas(16) glm::vec4 position;
     alignas(16) glm::vec4 colorIntensity;
+    alignas(4) float radius;
 };
 
 class LightBuffer : public ComputeBuffer
 {
 public:
-    static constexpr uint32_t MAX_LIGHTS = 64;
+    static constexpr uint32_t MAX_LIGHTS = 256;
 
     struct LightBufferObject
     {

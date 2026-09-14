@@ -40,6 +40,11 @@ vk::DescriptorSet GlobalDescriptorSet::GetDescriptorSet(uint32_t frameIndex) con
     return m_descriptorSets[frameIndex];
 }
 
+vk::Buffer GlobalDescriptorSet::GetLightIndexBuffer(uint32_t frameIndex) const
+{
+    return m_lightIndices->m_buffers[frameIndex];
+}
+
 // TODO: can these be more generic so i dont have to call them manually in main?
 void GlobalDescriptorSet::updateCamera(uint32_t frameIndex, const Camera& camera)
 {
@@ -52,6 +57,8 @@ void GlobalDescriptorSet::updateCamera(uint32_t frameIndex, const Camera& camera
     ubo.view = camera.m_view;
     ubo.proj = camera.m_proj;
     ubo.nearFar = glm::vec4(Camera::zNear, Camera::zFar, 0.0f, 0.0f);
+    vk::Extent2D extent = camera.m_swapChain->GetExtent();
+    ubo.screenSize = glm::vec4(static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 0.0f);
     m_camera->updateBuffer(&ubo, frameIndex);
 }
 

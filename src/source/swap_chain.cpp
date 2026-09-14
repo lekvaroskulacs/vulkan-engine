@@ -60,6 +60,12 @@ void SwapChain::recreateSwapChain()
     createImageViews();
 }
 
+void SwapChain::recreateSwapChain(vk::PresentModeKHR presentMode)
+{
+    m_presentMode = presentMode;
+    recreateSwapChain();
+}
+
 vk::SurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats)
 {
     for(const auto& availableFormat : availableFormats)
@@ -73,16 +79,15 @@ vk::SurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<vk::Su
     return availableFormats[0];
 }
 
-// TODO: make vsync optional
 vk::PresentModeKHR SwapChain::chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes)
 {
-    // for(const auto& availablePresentMode : availablePresentModes)
-    // {
-    //     if(availablePresentMode == vk::PresentModeKHR::eMailbox)
-    //     {
-    //         return availablePresentMode;
-    //     }
-    // }
+    for(const auto& availablePresentMode : availablePresentModes)
+    {
+        if(availablePresentMode == m_presentMode)
+        {
+            return availablePresentMode;
+        }
+    }
     return vk::PresentModeKHR::eFifo;
 }
 

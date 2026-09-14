@@ -12,7 +12,7 @@ const uint gridY = 9;
 const uint numSlices = 24;
 const uint numClusters = gridX * gridY * numSlices;
 
-const uint avgLights = 3;
+const uint avgLights = 15;
 
 struct AABB
 {
@@ -54,3 +54,9 @@ uint clusterIndex(uvec3 coord)
 {
     return coord.x + coord.y * gridX + coord.z * gridX * gridY;
 }
+
+bool contains(AABB aabb, vec3 p)
+{
+    return all(greaterThanEqual(p, aabb.min.xyz)) && all(lessThanEqual(p, aabb.max.xyz));
+}
+

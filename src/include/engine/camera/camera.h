@@ -14,6 +14,7 @@ class Camera
 public:
     constexpr static float zNear = 0.1f;
     constexpr static float zFar = 100.0f;
+    constexpr static float speed = 10.0f;
 
     Camera(GLFWwindow* window, std::shared_ptr<SwapChain> swapChain)
         : m_swapChain{swapChain}
@@ -29,7 +30,7 @@ public:
 
     void processInput(GLFWwindow* window, float dt)
     {
-        float cameraSpeed = 1.0f * dt;
+        float cameraSpeed = speed * dt;
         if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
             m_cameraPos += cameraSpeed * glm::normalize(m_cameraFront);
         if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)

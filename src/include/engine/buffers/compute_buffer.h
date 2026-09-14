@@ -20,7 +20,7 @@ constexpr uint32_t gridX = 16;
 constexpr uint32_t gridY = 9;
 constexpr uint32_t numSlices = 24;
 
-constexpr uint32_t avgLights = 3;
+constexpr uint32_t avgLights = 15;
 }
 
 class ClusterBoundsBuffer : public ComputeBuffer

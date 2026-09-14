@@ -1,0 +1,92 @@
+#version 450
+
+#include "common/scene_light.glsl"
+#include "common/cluster.glsl"
+
+// One workgroup handles every Z-slice of one (x, y) tile column, so its numSlices
+// invocations can cooperate on batching light loads into shared memory. Dispatch this
+// as (gridX, gridY, 1) groups - NOT (gridX, gridY, numSlices) like cluster_build.comp -
+// since the Z axis is covered by local invocations within the workgroup here instead
+// of by separate workgroups.
+layout (local_size_x = 1, local_size_y = 1, local_size_z = numSlices) in;
+
+shared SceneLight sharedLights[numSlices];
+
+float sqDistPointAABB(vec3 point, uint cluster)
+{
+    float sqDist = 0.0;
+    AABB currentCell = clusterBounds.aabb[cluster];
+    //cluster[tile].maxPoint[3] = tile;
+    for(int i = 0; i < 3; ++i)
+    {
+        float v = point[i];
+        if(v < currentCell.min[i])
+        {
+            sqDist += (currentCell.min[i] - v) * (currentCell.min[i] - v);
+        }
+        if(v > currentCell.max[i])
+        {
+            sqDist += (v - currentCell.max[i]) * (v - currentCell.max[i]);
+        }
+    }
+
+    return sqDist;
+}
+
+bool testSphereAABB(vec4 lightPosition, uint cluster, float radius)
+{
+    vec3 center = vec3(camera.view * lightPosition);
+    float squaredDist = sqDistPointAABB(center, cluster);
+
+    return squaredDist <= radius * radius;
+}
+
+void main()
+{
+    uint cluster = clusterIndex(gl_GlobalInvocationID);
+    uint threadCount = gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z;
+    uint lightCount = sceneLights.count;
+    uint numBatches = (lightCount + threadCount - 1) / threadCount;
+
+    uint visibleLightCount = 0;
+    uint visibleLightIndices[maxLights];
+
+    for (uint batch = 0; batch < numBatches; ++batch)
+    {
+        // Each invocation in the workgroup fetches one light from global memory into
+        // shared memory, so the whole group pays for threadCount reads per batch instead
+        // of every invocation independently re-reading the same lights.
+        uint lightIndex = min(batch * threadCount + gl_LocalInvocationIndex, lightCount - 1);
+        sharedLights[gl_LocalInvocationIndex] = sceneLights.lights[lightIndex];
+        barrier();
+
+        // The last batch may be partial; only test the lights actually loaded into it
+        // (the padding invocations above redundantly loaded the last real light, but we
+        // never test past batchSize so that never shows up as a duplicate/false result).
+        uint batchSize = min(threadCount, lightCount - batch * threadCount);
+        for (uint light = 0; light < batchSize; ++light)
+        {
+            if (testSphereAABB(sharedLights[light].position, cluster, sharedLights[light].radius))
+            {
+                visibleLightIndices[visibleLightCount] = batch * threadCount + light;
+                visibleLightCount += 1;
+            }
+        }
+
+        barrier();
+    }
+
+    // lightIndices.currentIdx must be reset to 0 on the CPU side before this dispatch runs
+    // each frame: every invocation atomically claiming a slice of it here relies on it
+    // starting from a known value, and clusters run across many workgroups with no
+    // ordering guarantee between them, so resetting it from inside the shader (as before)
+    // is a race, not a fix.
+    uint offset = atomicAdd(lightIndices.currentIdx, visibleLightCount);
+    for (uint i = 0; i < visibleLightCount; ++i)
+    {
+        lightIndices.indices[offset + i] = visibleLightIndices[i];
+    }
+
+    lightGrid.lightsPerCluster[cluster].offset = offset;
+    lightGrid.lightsPerCluster[cluster].count = visibleLightCount;
+}

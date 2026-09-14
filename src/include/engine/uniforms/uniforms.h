@@ -109,6 +109,7 @@ public:
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
         alignas(16) glm::vec4 nearFar; // x = near, y = far
+        alignas(16) glm::vec4 screenSize; // x = width, y = height, in pixels
     };
 
     explicit UniformCamera(std::shared_ptr<Device> device)

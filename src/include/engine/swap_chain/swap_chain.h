@@ -22,6 +22,7 @@ public:
     ~SwapChain();
 
     void recreateSwapChain();
+    void recreateSwapChain(vk::PresentModeKHR presentMode);
 
 private:
     vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats);
@@ -45,5 +46,7 @@ private:
     std::vector<vk::Image> m_presentImages;
     std::vector<VmaAllocation> m_presentImageAllocations;
     std::vector<vk::ImageView> m_presentImageViews;
+
+    vk::PresentModeKHR m_presentMode;
 };
 } // namespace engine

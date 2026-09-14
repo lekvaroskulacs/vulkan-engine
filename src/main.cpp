@@ -21,6 +21,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <random>
 #include <set>
 #include <stdexcept>
 #include <unordered_map>
@@ -82,7 +83,8 @@ public:
             }
         }; 
         m_buildClustersPipeline = std::make_unique<engine::PipelineCompute>(m_device, clusterParams, m_globalSet->GetLayout());
-
+        clusterParams.m_shaderPaths.m_computeShaderPath = "shaders/compute/light_cull.comp";
+        m_cullLightsPipeline = std::make_unique<engine::PipelineCompute>(m_device, clusterParams, m_globalSet->GetLayout());
 
         engine::Texture2DParams vikingTexParams{.m_filepath = "textures/viking_room.png"};
         engine::TextureCubeParams env_params{.m_filepaths = {
@@ -94,8 +96,20 @@ public:
             "textures/skybox6.jpg",
         }};
 
-        m_lights.push_back({glm::vec4{0.0f, 0.0f, 0.0f, 1.0f}, glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}});
-        m_lights.push_back({glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}, glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}});
+        {
+            std::mt19937 rng{ 100 };
+            std::uniform_real_distribution<float> posX(-100.0f, 100.0f);
+            std::uniform_real_distribution<float> posY(1.0f, 8.0f);
+            std::uniform_real_distribution<float> posZ(-30.0f, 30.0f);
+            std::uniform_real_distribution<float> colorDist(0.3f, 1.0f);
+
+            for(int i = 0; i < 100; ++i)
+            {
+                glm::vec4 position{posX(rng), posY(rng), posZ(rng), 1.0f};
+                glm::vec4 colorIntensity{colorDist(rng), colorDist(rng), colorDist(rng), 1.0f};
+                m_lights.push_back({position, colorIntensity, 20.0f});
+            }
+        }
 
         auto shadowLightUpdate = [&](engine::UpdatableBuffer& uniform, int currentImage) {
             auto* light = dynamic_cast<engine::UniformLight*>(&uniform);
@@ -116,7 +130,7 @@ public:
         };
 
         auto debug = std::make_unique<engine::FullscreenQuadMesh>(m_device, m_commandBuffer);
-        m_testInterior = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, "models/InteriorTest.obj");
+        m_testInterior = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, "models/sponza.obj");
         m_testInterior->addUniform<engine::UniformGameObject>(
             0, vk::ShaderStageFlagBits::eVertex, [&](engine::UpdatableBuffer& uniform, int currentImage) {
                 auto* mvp = dynamic_cast<engine::UniformGameObject*>(&uniform);
@@ -124,6 +138,7 @@ public:
                 {
                     engine::UniformGameObject::UniformBufferObject ubo{};
                     ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+                    ubo.model *= glm::scale(ubo.model, glm::vec3{0.05f});
                     ubo.view = m_camera->m_view;
                     ubo.proj = m_camera->m_proj;
                     mvp->updateBuffer(&ubo, currentImage);
@@ -228,6 +243,7 @@ private:
             refs.m_light_pos = &m_light_pos;
             refs.m_light_facing = &m_light_facing;
             refs.m_lights = &m_lights;
+            refs.m_renderer = m_renderer.get();
             m_ui->buildInterface(refs);
 
             m_globalSet->updateCamera(m_renderer->GetCurrentFrame(), *m_camera);
