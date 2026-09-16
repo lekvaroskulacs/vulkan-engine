@@ -27,30 +27,6 @@ float linearizeDepth(float depth)
   return (2.0 * n) / (f + n - z * (f - n));	
 }
 
-// float filterPCF(vec4 sc)
-// {
-// 	ivec2 texDim = textureSize(shadowMap, 0);
-// 	float scale = 1.5;
-// 	float dx = scale * 1.0 / float(texDim.x);
-// 	float dy = scale * 1.0 / float(texDim.y);
-
-// 	float shadowFactor = 0.0;
-// 	int count = 0;
-// 	int range = 1;
-	
-// 	for (int x = -range; x <= range; x++)
-// 	{
-// 		for (int y = -range; y <= range; y++)
-// 		{
-// 			shadowFactor += textureProj(sc, vec2(dx*x, dy*y));
-// 			count++;
-// 		}
-	
-// 	}
-// 	return shadowFactor / count;
-// }
-
-
 void main() {
     vec3 normal = normalize(worldNormal.xyz);
     vec3 x = worldPos.xyz / worldPos.w;
@@ -78,7 +54,4 @@ void main() {
     radiance += iterateLightsClustered(x, normal);
     
     outColor = vec4(radiance, 1.0);
-
-    //outColor = vec4(vec3(closestDepth), 1.0);
-
 }

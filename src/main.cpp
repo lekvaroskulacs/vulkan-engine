@@ -33,7 +33,8 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #define TINYOBJLOADER_IMPLEMENTATION
 #define VMA_IMPLEMENTATION
 
-#include <engine/fullscreen_quad/fullscreen_quad.h>
+#include <engine/mesh/plane.h>
+#include <engine/mesh/fullscreen_quad.h>
 #include <engine/camera/camera.h>
 #include <engine/command_buffer/command_buffer.h>
 #include <engine/device/device.h>
@@ -103,13 +104,15 @@ public:
             std::uniform_real_distribution<float> posZ(-30.0f, 30.0f);
             std::uniform_real_distribution<float> colorDist(0.3f, 1.0f);
 
-            for(int i = 0; i < 100; ++i)
+            for(int i = 0; i < 1; ++i)
             {
                 glm::vec4 position{posX(rng), posY(rng), posZ(rng), 1.0f};
                 glm::vec4 colorIntensity{colorDist(rng), colorDist(rng), colorDist(rng), 1.0f};
                 m_lights.push_back({position, colorIntensity, 20.0f});
             }
         }
+
+        m_lights.push_back({{1.0f, 1.0, 1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 1.0f});
 
         auto shadowLightUpdate = [&](engine::UpdatableBuffer& uniform, int currentImage) {
             auto* light = dynamic_cast<engine::UniformLight*>(&uniform);
@@ -185,6 +188,30 @@ public:
             *m_globalSet,
             {.m_vertexShaderPath = "shaders/transform.vert", .m_fragmentShaderPath = "shaders/textured_max_blinn.frag"});
 
+
+        auto planeMesh = std::make_unique<engine::PlaneMesh>(m_device, m_commandBuffer, 100.0f, 100.0f, 1000, 1000);
+        m_terrain = std::make_unique<engine::GameObject>(m_device, m_commandBuffer, std::move(planeMesh));
+        m_terrain->addUniform<engine::UniformGameObject>(
+            0, vk::ShaderStageFlagBits::eVertex, [&](engine::UpdatableBuffer& uniform, int currentImage) {
+                auto* mvp = dynamic_cast<engine::UniformGameObject*>(&uniform);
+                if(mvp)
+                {
+                    engine::UniformGameObject::UniformBufferObject ubo{};
+                    ubo.model = glm::identity<glm::mat4>();
+                    ubo.view = m_camera->m_view;
+                    ubo.proj = m_camera->m_proj;
+                    mvp->updateBuffer(&ubo, currentImage);
+                }
+            });
+        m_terrain->addTexture<engine::Texture2D, engine::Texture2DParams>(
+            1, vk::ShaderStageFlagBits::eVertex, std::move(engine::Texture2DParams{.m_filepath = "textures/hills_height.png"}));
+        m_terrain->addTexture<engine::Texture2D, engine::Texture2DParams>(
+            2, vk::ShaderStageFlagBits::eVertex, std::move(engine::Texture2DParams{.m_filepath = "textures/hills_height_normal.png"}));
+        m_terrain->finalizeGameObject(
+            m_renderPasses,
+            *m_globalSet,
+            {.m_vertexShaderPath = "shaders/transform_displace.vert", .m_fragmentShaderPath = "shaders/max_blinn.frag"});
+
     }
 
     void run()
@@ -213,6 +240,7 @@ private:
     std::unique_ptr<engine::GameObject> m_testInterior;
     std::unique_ptr<engine::GameObject> m_skybox;
     std::unique_ptr<engine::GameObject> m_skull;
+    std::unique_ptr<engine::GameObject> m_terrain;
 
     glm::vec3 m_light_pos = glm::vec3(-2.0f, 0.1f, 0.0f);
     glm::vec3 m_light_facing = glm::vec3(1.0f);
@@ -251,8 +279,9 @@ private:
 
             std::vector<engine::PerMeshRenderData> params_list;
             params_list.push_back(m_skybox->getDrawFrameParams());
-            params_list.push_back(m_testInterior->getDrawFrameParams());
+            //params_list.push_back(m_testInterior->getDrawFrameParams());
             params_list.push_back(m_skull->getDrawFrameParams());
+            params_list.push_back(m_terrain->getDrawFrameParams());
 
             engine::DrawFrameData data
             {

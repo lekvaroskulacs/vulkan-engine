@@ -32,13 +32,17 @@ vec3 iterateLights(vec3 worldPosition, vec3 normal)
     vec3 radiance = vec3(0.0);
     for (int i = 0; i < sceneLights.count; i++)
     {
-        vec3 lightDiff = sceneLights.lights[i].position.xyz - worldPosition;
+        vec3 lightDiff = sceneLights.lights[i].position.xyz - worldPosition * sceneLights.lights[i].position.w;
         vec3 lightDir = normalize(lightDiff);
         float lightDist2 = dot(lightDiff, lightDiff);
 
         float radius = sceneLights.lights[i].radius;
         float window = clamp(1.0 - pow(lightDist2 / (radius * radius), 2.0), 0.0, 1.0);
         float atten = (window * window) / lightDist2;
+        if (sceneLights.lights[i].position.w <= 0.01)
+        {
+            atten = 1.0;
+        }
 
         radiance += shade(sceneLights.lights[i].colorIntensity.xyz * atten, normal, lightDir, viewDir);
     }
@@ -72,12 +76,16 @@ vec3 iterateLightsClustered(vec3 worldPosition, vec3 normal)
     for (uint i = 0u; i < props.count; ++i)
     {
         SceneLight light = sceneLights.lights[lightIndices.indices[props.offset + i]];
-        vec3 lightDiff = light.position.xyz - worldPosition;
+        vec3 lightDiff = light.position.xyz - worldPosition * light.position.w;
         vec3 lightDir = normalize(lightDiff);
         float lightDist2 = dot(lightDiff, lightDiff);
 
         float window = clamp(1.0 - pow(lightDist2 / (light.radius * light.radius), 2.0), 0.0, 1.0);
         float atten = (window * window) / lightDist2;
+        if (light.position.w <= 0.01)
+        {
+            atten = 1.0;
+        }
 
         radiance += shade(light.colorIntensity.xyz * atten, normal, lightDir, viewDir);
     }
