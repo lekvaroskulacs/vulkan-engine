@@ -1,4 +1,5 @@
 #include <engine/renderer/renderer.h>
+#include <engine/pipeline/grass_pipeline.h>
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
@@ -9,6 +10,100 @@
 
 namespace engine
 {
+
+namespace {
+
+void recordFrameBeginCompute(vk::CommandBuffer commandBuffer, const DrawFrameData& data, uint32_t currentFrame, std::shared_ptr<GlobalDescriptorSet> globalDescriptorSet)
+{
+    vk::DescriptorSet globalSet = globalDescriptorSet->GetDescriptorSet(currentFrame);
+    
+    auto& buildClusterPipeline = data.m_frameBeginComputeSteps.at(ComputeStage::BuildClusterGrid);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, buildClusterPipeline->Get());
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, buildClusterPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
+    commandBuffer.dispatch(cluster::gridX, cluster::gridY, cluster::numSlices);
+
+    vk::MemoryBarrier clusterBuildBarrier{
+        .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+        .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+    };
+    commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                  vk::PipelineStageFlagBits::eComputeShader,
+                                  {},
+                                  1, &clusterBuildBarrier,
+                                  0, nullptr,
+                                  0, nullptr);
+
+    
+    commandBuffer.fillBuffer(globalDescriptorSet->GetLightIndexBuffer(currentFrame), 0, sizeof(uint32_t), 0);
+
+    vk::MemoryBarrier lightIndexResetBarrier{
+        .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+        .dstAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
+    };
+    commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                  vk::PipelineStageFlagBits::eComputeShader,
+                                  {},
+                                  1, &lightIndexResetBarrier,
+                                  0, nullptr,
+                                  0, nullptr);
+
+    auto& cullLightsPipeline = data.m_frameBeginComputeSteps.at(ComputeStage::CullLights);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, cullLightsPipeline->Get());
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, cullLightsPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
+    commandBuffer.dispatch(cluster::gridX, cluster::gridY, 1);
+
+    commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                  vk::PipelineStageFlagBits::eFragmentShader,
+                                  {},
+                                  1, &clusterBuildBarrier,
+                                  0, nullptr,
+                                  0, nullptr);
+
+    auto& buildGrassPipeline = data.m_frameBeginComputeSteps.at(ComputeStage::BuildGrass);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, buildGrassPipeline->Get());
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, buildGrassPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
+    commandBuffer.dispatch(1, 1, 1);
+
+    vk::MemoryBarrier buildGrassBarrier{
+        .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+        .dstAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eIndirectCommandRead,
+    };
+    commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                  vk::PipelineStageFlagBits::eVertexShader | vk::PipelineStageFlagBits::eFragmentShader |
+                                      vk::PipelineStageFlagBits::eDrawIndirect,
+                                  {},
+                                  1, &buildGrassBarrier,
+                                  0, nullptr,
+                                  0, nullptr);
+}
+
+void recordIndirectDraw(vk::CommandBuffer commandBuffer,
+                        PipelineGrass* grassPipeline,
+                        vk::DescriptorSet globalSet,
+                        vk::Buffer indirectBuffer,
+                        vk::Extent2D extent)
+{
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, grassPipeline->Get());
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, grassPipeline->GetLayout(), 0, 1, &globalSet, 0, nullptr);
+
+    vk::Viewport viewport{
+        .x = 0.0f,
+        .y = 0.0f,
+        .width = static_cast<float>(extent.width),
+        .height = static_cast<float>(extent.height),
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f,
+    };
+    commandBuffer.setViewport(0, 1, &viewport);
+
+    vk::Rect2D scissor{.offset = {0, 0}, .extent = extent};
+    commandBuffer.setScissor(0, 1, &scissor);
+
+    commandBuffer.drawIndirect(indirectBuffer, 0, 1, sizeof(GrassDataBuffer::SSBO));
+}
+
+
+}
 
 Renderer::Renderer(std::shared_ptr<Device> device,
                    std::shared_ptr<SwapChain> swapChain,
@@ -57,50 +152,10 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
     {
         throw std::runtime_error("Failed to begin recording command buffer");
     }
-    
+
     vk::DescriptorSet globalSet = m_globalDescriptorSet->GetDescriptorSet(m_currentFrame);
 
-    auto& buildClusterPipeline = data.m_frameBeginComputeSteps[0];
-    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, buildClusterPipeline->Get());
-    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, buildClusterPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
-    commandBuffer.dispatch(cluster::gridX, cluster::gridY, cluster::numSlices);
-
-    vk::MemoryBarrier clusterBuildBarrier{
-        .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
-        .dstAccessMask = vk::AccessFlagBits::eShaderRead,
-    };
-    commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                                  vk::PipelineStageFlagBits::eComputeShader,
-                                  {},
-                                  1, &clusterBuildBarrier,
-                                  0, nullptr,
-                                  0, nullptr);
-
-    
-    commandBuffer.fillBuffer(m_globalDescriptorSet->GetLightIndexBuffer(m_currentFrame), 0, sizeof(uint32_t), 0);
-
-    vk::MemoryBarrier lightIndexResetBarrier{
-        .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-        .dstAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
-    };
-    commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-                                  vk::PipelineStageFlagBits::eComputeShader,
-                                  {},
-                                  1, &lightIndexResetBarrier,
-                                  0, nullptr,
-                                  0, nullptr);
-
-    auto& cullLightsPipeline = data.m_frameBeginComputeSteps[1];
-    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, cullLightsPipeline->Get());
-    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, cullLightsPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
-    commandBuffer.dispatch(cluster::gridX, cluster::gridY, 1);
-
-    commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                                  vk::PipelineStageFlagBits::eFragmentShader,
-                                  {},
-                                  1, &clusterBuildBarrier,
-                                  0, nullptr,
-                                  0, nullptr);
+    recordFrameBeginCompute(commandBuffer, data, m_currentFrame, m_globalDescriptorSet);
 
     for(auto& [stage, pass] : m_renderPasses)
     {
@@ -177,6 +232,17 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
                                                  0,
                                                  nullptr);
                 commandBuffer.drawIndexed(static_cast<uint32_t>(drawable.m_mesh.GetIndices().size()), 1, 0, 0, 0);
+            }
+
+            // Grass is only built against the General render pass, so it can't be bound
+            // while any other render pass (e.g. the shadow passes) is active.
+            if(stage == RenderPassStage::General)
+            {
+                recordIndirectDraw(commandBuffer,
+                                   data.m_indirectRenderData.m_grassPipeline,
+                                   globalSet,
+                                   m_globalDescriptorSet->GetGrassDataBuffer(m_currentFrame),
+                                   extent);
             }
 
             // ImGui only ever draws to screen, so it's tied to the General pass specifically.

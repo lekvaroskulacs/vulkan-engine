@@ -78,14 +78,24 @@ public:
             m_device, m_swapChain, m_renderPasses, m_commandBuffer, m_camera, m_ui, m_globalSet);
         m_window->SetResizeCallback(engine::Renderer::framebufferResizeCallback);
 
-        auto clusterParams = engine::CreatePipelineParams{
+        auto computeParams = engine::CreatePipelineParams{
             .m_shaderPaths = {
                 .m_computeShaderPath = "shaders/compute/cluster_build.comp"
             }
         }; 
-        m_buildClustersPipeline = std::make_unique<engine::PipelineCompute>(m_device, clusterParams, m_globalSet->GetLayout());
-        clusterParams.m_shaderPaths.m_computeShaderPath = "shaders/compute/light_cull.comp";
-        m_cullLightsPipeline = std::make_unique<engine::PipelineCompute>(m_device, clusterParams, m_globalSet->GetLayout());
+        m_buildClustersPipeline = std::make_unique<engine::PipelineCompute>(m_device, computeParams, m_globalSet->GetLayout());
+        computeParams.m_shaderPaths.m_computeShaderPath = "shaders/compute/light_cull.comp";
+        m_cullLightsPipeline = std::make_unique<engine::PipelineCompute>(m_device, computeParams, m_globalSet->GetLayout());
+        computeParams.m_shaderPaths.m_computeShaderPath = "shaders/compute/grass.comp";
+        m_buildGrassPipeline = std::make_unique<engine::PipelineCompute>(m_device, computeParams, m_globalSet->GetLayout());
+
+        auto grassParams = engine::CreatePipelineParams{
+            .m_shaderPaths = {
+                .m_vertexShaderPath = "shaders/indirect_test.vert",
+                .m_fragmentShaderPath = "shaders/indirect_test.frag"
+            }
+        };
+        m_grassPipeline = std::make_unique<engine::PipelineGrass>(m_device, m_generalRenderPass, grassParams, m_globalSet->GetLayout());
 
         engine::Texture2DParams vikingTexParams{.m_filepath = "textures/viking_room.png"};
         engine::TextureCubeParams env_params{.m_filepaths = {
@@ -234,6 +244,9 @@ private:
 
     std::unique_ptr<engine::PipelineCompute> m_buildClustersPipeline;
     std::unique_ptr<engine::PipelineCompute> m_cullLightsPipeline;
+    std::unique_ptr<engine::PipelineCompute> m_buildGrassPipeline;
+
+    std::unique_ptr<engine::PipelineGrass> m_grassPipeline;
 
     std::shared_ptr<engine::Camera> m_camera;
 
@@ -285,8 +298,13 @@ private:
 
             engine::DrawFrameData data
             {
-                .m_frameBeginComputeSteps = {m_buildClustersPipeline.get(), m_cullLightsPipeline.get()},
+                .m_frameBeginComputeSteps = {
+                    {engine::ComputeStage::BuildClusterGrid, m_buildClustersPipeline.get()},
+                    {engine::ComputeStage::CullLights, m_cullLightsPipeline.get()},
+                    {engine::ComputeStage::BuildGrass, m_buildGrassPipeline.get()},
+                },
                 .m_renderData = params_list,
+                .m_indirectRenderData = {m_grassPipeline.get()}
             };
             m_renderer->drawFrame(data);
         }

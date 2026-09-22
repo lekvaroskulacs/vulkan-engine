@@ -27,6 +27,7 @@ public:
     void updateLights(uint32_t frameIndex, const std::vector<Light>& lights);
 
     vk::Buffer GetLightIndexBuffer(uint32_t frameIndex) const;
+    vk::Buffer GetGrassDataBuffer(uint32_t frameIndex) const;
 
 private:
     void createDescriptorSetLayout();
@@ -39,6 +40,8 @@ private:
     std::unique_ptr<ClusterBoundsBuffer> m_clusterBounds; // binding 2
     std::unique_ptr<LightGridBuffer> m_lightGrid; // binding 3
     std::unique_ptr<LightIndexBuffer> m_lightIndices; // binding 4
+    std::unique_ptr<GrassDataBuffer> m_grassData; // binding 5
+    std::unique_ptr<GrassInstanceDataBuffer> m_grassInstances; // binding 6
 
     vk::DescriptorSetLayout m_descriptorSetLayout;
     vk::DescriptorPool m_descriptorPool;

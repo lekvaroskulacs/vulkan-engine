@@ -4,6 +4,7 @@
 
 #include <engine/pipeline/pipeline.h>
 #include <engine/pipeline/compute_pipeline.h>
+#include <engine/pipeline/grass_pipeline.h>
 #include <engine/renderpass/render_pass.h>
 #include <engine/camera/camera.h>
 #include <engine/command_buffer/command_buffer.h>
@@ -34,10 +35,23 @@ struct PerMeshRenderData
     glm::vec3 m_shadow_light_position;
 };
 
+struct IndirectRenderData
+{
+    PipelineGrass* m_grassPipeline;
+};
+
+enum class ComputeStage
+{
+    BuildClusterGrid,
+    CullLights,
+    BuildGrass
+};
+
 struct DrawFrameData
 {
-    std::vector<PipelineCompute*> m_frameBeginComputeSteps;
+    std::unordered_map<ComputeStage, PipelineCompute*> m_frameBeginComputeSteps;
     std::vector<PerMeshRenderData> m_renderData;
+    IndirectRenderData m_indirectRenderData;
 };
 
 class Renderer

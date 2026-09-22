@@ -55,6 +55,7 @@ protected:
         : m_device{device}
         , m_usage{usage}
     {
+        m_bufferSize = bufferSize;
         m_buffers.resize(MAX_FRAMES_IN_FLIGHT);
         m_bufferAllocations.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -95,7 +96,6 @@ public:
     explicit UniformGameObject(std::shared_ptr<Device> device)
         : Uniform(device, sizeof(UniformBufferObject))
     {
-        m_bufferSize = sizeof(UniformBufferObject);
     }
 };
 
@@ -115,7 +115,6 @@ public:
     explicit UniformCamera(std::shared_ptr<Device> device)
         : Uniform(device, sizeof(UniformBufferObject))
     {
-        m_bufferSize = sizeof(UniformBufferObject);
     }
 };
 
@@ -133,7 +132,6 @@ public:
     explicit UniformLight(std::shared_ptr<Device> device)
         : Uniform(device, sizeof(UniformBufferObject))
     {
-        m_bufferSize = sizeof(UniformBufferObject);
     }
 };
 

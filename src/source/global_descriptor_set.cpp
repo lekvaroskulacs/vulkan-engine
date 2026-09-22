@@ -18,6 +18,8 @@ GlobalDescriptorSet::GlobalDescriptorSet(std::shared_ptr<Device> device)
     m_clusterBounds = std::make_unique<ClusterBoundsBuffer>(m_device);
     m_lightGrid = std::make_unique<LightGridBuffer>(m_device);
     m_lightIndices = std::make_unique<LightIndexBuffer>(m_device);
+    m_grassData = std::make_unique<GrassDataBuffer>(m_device);
+    m_grassInstances = std::make_unique<GrassInstanceDataBuffer>(m_device);
 
     createDescriptorSetLayout();
     createDescriptorPool();
@@ -43,6 +45,11 @@ vk::DescriptorSet GlobalDescriptorSet::GetDescriptorSet(uint32_t frameIndex) con
 vk::Buffer GlobalDescriptorSet::GetLightIndexBuffer(uint32_t frameIndex) const
 {
     return m_lightIndices->m_buffers[frameIndex];
+}
+
+vk::Buffer GlobalDescriptorSet::GetGrassDataBuffer(uint32_t frameIndex) const
+{
+    return m_grassData->m_buffers[frameIndex];
 }
 
 // TODO: can these be more generic so i dont have to call them manually in main?
@@ -75,7 +82,7 @@ void GlobalDescriptorSet::updateLights(uint32_t frameIndex, const std::vector<Li
 // right now you need to add code in 3 different functions
 void GlobalDescriptorSet::createDescriptorSetLayout()
 {
-    std::array<vk::DescriptorSetLayoutBinding, 5> bindings{
+    std::array<vk::DescriptorSetLayoutBinding, 7> bindings{
         vk::DescriptorSetLayoutBinding{
             .binding = 0,
             .descriptorType = vk::DescriptorType::eUniformBuffer,
@@ -111,6 +118,20 @@ void GlobalDescriptorSet::createDescriptorSetLayout()
             .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment,
             .pImmutableSamplers = nullptr,
         },
+        vk::DescriptorSetLayoutBinding{
+            .binding = 5,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr,
+        },
+        vk::DescriptorSetLayoutBinding{
+            .binding = 6,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr,
+        },
     };
 
     vk::DescriptorSetLayoutCreateInfo layoutInfo{
@@ -128,7 +149,7 @@ void GlobalDescriptorSet::createDescriptorPool()
 {
     std::array<vk::DescriptorPoolSize, 2> poolSizes{
         vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, MAX_FRAMES_IN_FLIGHT},
-        vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, MAX_FRAMES_IN_FLIGHT * 4},
+        vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, MAX_FRAMES_IN_FLIGHT * 6},
     };
 
     vk::DescriptorPoolCreateInfo poolInfo{
@@ -185,8 +206,17 @@ void GlobalDescriptorSet::createDescriptorSets()
             .offset = 0,
             .range = m_lightIndices->getBufferSize(),
         };
-
-        std::array<vk::WriteDescriptorSet, 5> writes{
+        vk::DescriptorBufferInfo grassDataInfo{
+            .buffer = m_grassData->m_buffers[i],
+            .offset = 0,
+            .range = m_grassData->getBufferSize(),
+        };
+        vk::DescriptorBufferInfo grassInstancesInfo{
+            .buffer = m_grassInstances->m_buffers[i],
+            .offset = 0,
+            .range = m_grassInstances->getBufferSize(),
+        };
+        std::array<vk::WriteDescriptorSet, 7> writes{
             vk::WriteDescriptorSet{
                 .dstSet = m_descriptorSets[i],
                 .dstBinding = 0,
@@ -226,6 +256,22 @@ void GlobalDescriptorSet::createDescriptorSets()
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eStorageBuffer,
                 .pBufferInfo = &lightIndicesInfo,
+            },
+            vk::WriteDescriptorSet{
+                .dstSet = m_descriptorSets[i],
+                .dstBinding = 5,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eStorageBuffer,
+                .pBufferInfo = &grassDataInfo,
+            },
+            vk::WriteDescriptorSet{
+                .dstSet = m_descriptorSets[i],
+                .dstBinding = 6,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eStorageBuffer,
+                .pBufferInfo = &grassInstancesInfo,
             },
         };
 

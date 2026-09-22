@@ -1,0 +1,40 @@
+#version 450
+
+struct GrassInstanceData
+{
+    vec3 position;
+    vec2 facing;
+};
+
+// Layout matches VkDrawIndirectCommand so this buffer can be bound directly as the
+// indirect-args buffer for vkCmdDrawIndirect.
+layout (set = 0, binding = 5) buffer GrassData
+{
+    uint vertexCount;
+    uint instanceCount;
+    uint firstVertex;
+    uint firstInstance;
+} grassData;
+
+layout (set = 0, binding = 6) buffer GrassInstanceBuffer
+{
+    GrassInstanceData grassInstanceData[];
+} grassInstanceBuffer;
+
+layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+const uint dummyInstanceCount = 64;
+
+void main()
+{
+    grassData.vertexCount = 3;
+    grassData.instanceCount = dummyInstanceCount;
+    grassData.firstVertex = 0;
+    grassData.firstInstance = 0;
+
+    for (uint i = 0; i < dummyInstanceCount; ++i)
+    {
+        grassInstanceBuffer.grassInstanceData[i].position = vec3(float(i) * 2.0, 0.0, 0.0);
+        grassInstanceBuffer.grassInstanceData[i].facing = vec2(1.0, 0.0);
+    }
+}

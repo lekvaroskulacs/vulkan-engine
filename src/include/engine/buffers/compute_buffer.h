@@ -9,8 +9,8 @@ namespace engine {
 class ComputeBuffer : public ConcreteBuffer
 {
 protected:
-    explicit ComputeBuffer(std::shared_ptr<Device> device, vk::DeviceSize bufferSize)
-        : ConcreteBuffer(device, bufferSize, vk::BufferUsageFlagBits::eStorageBuffer)
+    explicit ComputeBuffer(std::shared_ptr<Device> device, vk::DeviceSize bufferSize, vk::BufferUsageFlags extraUsage = {})
+        : ConcreteBuffer(device, bufferSize, vk::BufferUsageFlagBits::eStorageBuffer | extraUsage)
     {
     }
 };
@@ -34,7 +34,6 @@ public:
     explicit ClusterBoundsBuffer(std::shared_ptr<Device> device)
         : ComputeBuffer{ device, sizeof(SSBO) }
     {
-        m_bufferSize = sizeof(SSBO);
     }
 };
 
@@ -55,7 +54,6 @@ public:
     explicit LightGridBuffer(std::shared_ptr<Device> device)
         : ComputeBuffer{ device, sizeof(SSBO) }
     {
-        m_bufferSize = sizeof(SSBO);
     }
 };
 
@@ -71,7 +69,45 @@ public:
     explicit LightIndexBuffer(std::shared_ptr<Device> device)
         : ComputeBuffer{ device, sizeof(SSBO) }
     {
-        m_bufferSize = sizeof(SSBO);
+    }
+};
+
+// Layout matches VkDrawIndirectCommand exactly, so this buffer can be written by
+// grass.comp and then fed straight into vkCmdDrawIndirect as the indirect-args buffer.
+class GrassDataBuffer : public ComputeBuffer
+{
+public:
+    struct SSBO
+    {
+        alignas(4) uint32_t vertexCount;
+        alignas(4) uint32_t instanceCount;
+        alignas(4) uint32_t firstVertex;
+        alignas(4) uint32_t firstInstance;
+    };
+
+    explicit GrassDataBuffer(std::shared_ptr<Device> device)
+        : ComputeBuffer{ device, sizeof(SSBO), vk::BufferUsageFlagBits::eIndirectBuffer }
+    {
+    }
+};
+
+struct GrassInstanceData
+{
+    alignas(16) glm::vec3 position;
+    alignas(16) glm::vec2 facing;
+};
+
+class GrassInstanceDataBuffer : public ComputeBuffer
+{
+public:
+    struct SSBO
+    {
+        GrassInstanceData m_instances[100000]; // TODO: make this dynamic
+    };
+
+    explicit GrassInstanceDataBuffer(std::shared_ptr<Device> device)
+        : ComputeBuffer{ device, sizeof(SSBO) }
+    {
     }
 };
 
