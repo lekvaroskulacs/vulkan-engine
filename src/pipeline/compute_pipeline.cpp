@@ -5,7 +5,6 @@
 namespace engine
 {
 
-// TODO: this should take in shared ptr of globalSetLayout
 PipelineCompute::PipelineCompute(std::shared_ptr<Device> device,
                                  const CreatePipelineParams& params,
                                  vk::DescriptorSetLayout globalSetLayout)

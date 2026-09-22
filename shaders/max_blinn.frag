@@ -19,5 +19,4 @@ void main() {
      vec3 radiance = iterateLightsClustered(x, normal);
      //radiance += shade(light.powerDensity.xyz / lightDiff2, normal, lightDir, viewDir);
      outColor = vec4(texColor * radiance, 1.0);
-
 }

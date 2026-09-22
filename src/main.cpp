@@ -213,10 +213,10 @@ public:
                     mvp->updateBuffer(&ubo, currentImage);
                 }
             });
-        m_terrain->addTexture<engine::Texture2D, engine::Texture2DParams>(
-            1, vk::ShaderStageFlagBits::eVertex, std::move(engine::Texture2DParams{.m_filepath = "textures/hills_height.png"}));
-        m_terrain->addTexture<engine::Texture2D, engine::Texture2DParams>(
-            2, vk::ShaderStageFlagBits::eVertex, std::move(engine::Texture2DParams{.m_filepath = "textures/hills_height_normal.png"}));
+        // m_terrain->addTexture<engine::Texture2D, engine::Texture2DParams>(
+        //     1, vk::ShaderStageFlagBits::eVertex, std::move(engine::Texture2DParams{.m_filepath = "textures/hills_height.png"}));
+        // m_terrain->addTexture<engine::Texture2D, engine::Texture2DParams>(
+        //     2, vk::ShaderStageFlagBits::eVertex, std::move(engine::Texture2DParams{.m_filepath = "textures/hills_height_normal.png"}));
         m_terrain->finalizeGameObject(
             m_renderPasses,
             *m_globalSet,
@@ -279,7 +279,8 @@ private:
                 {"skybox", &m_skybox->GetPipeline()}, 
                 {"shadow", &m_testInterior->GetShadowPipeline()},
                 {"clusterCompute", m_buildClustersPipeline.get()},
-                {"cullLightsCompute", m_cullLightsPipeline.get()}
+                {"cullLightsCompute", m_cullLightsPipeline.get()},
+                {"terrain", &m_terrain->GetPipeline()}
             };
             refs.m_light_pos = &m_light_pos;
             refs.m_light_facing = &m_light_facing;
