@@ -232,6 +232,7 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t ima
                                                  0,
                                                  nullptr);
                 commandBuffer.drawIndexed(static_cast<uint32_t>(drawable.m_mesh.GetIndices().size()), 1, 0, 0, 0);
+
             }
 
             // Grass is only built against the General render pass, so it can't be bound
