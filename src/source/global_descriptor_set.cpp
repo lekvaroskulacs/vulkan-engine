@@ -129,7 +129,7 @@ void GlobalDescriptorSet::createDescriptorSetLayout()
             .binding = 6,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
             .pImmutableSamplers = nullptr,
         },
     };

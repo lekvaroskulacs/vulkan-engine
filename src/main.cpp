@@ -91,8 +91,8 @@ public:
 
         auto grassParams = engine::CreatePipelineParams{
             .m_shaderPaths = {
-                .m_vertexShaderPath = "shaders/indirect_test.vert",
-                .m_fragmentShaderPath = "shaders/indirect_test.frag"
+                .m_vertexShaderPath = "shaders/grass.vert",
+                .m_fragmentShaderPath = "shaders/grass.frag"
             }
         };
         m_grassPipeline = std::make_unique<engine::PipelineGrass>(m_device, m_generalRenderPass, grassParams, m_globalSet->GetLayout());

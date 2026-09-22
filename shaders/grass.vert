@@ -1,5 +1,9 @@
 #version 450
 
+#define GRASS_BUFFER_QUALIFIER readonly
+#include "common/scene_light.glsl"
+#include "common/grass.glsl"
+
 const float bladeHeight = 1.0;
 const float baseHalfWidth = 0.03;
 const int numSegments = 6;
@@ -47,10 +51,30 @@ const int bladeIndices[39] = int[39](
     12, 13, 14
 );
 
+const vec3 bladeNormal = normalize(cross(normalize(bladeVertices[1] - bladeVertices[0]),
+                                         normalize(bladeVertices[2] - bladeVertices[0])));
+
+
+const float maxRoundAngle = radians(75.0);
+
+vec3 roundedBladeNormal(float localX)
+{
+    float t = clamp(localX / baseHalfWidth, -1.0, 1.0);
+    float theta = t * maxRoundAngle;
+    return normalize(vec3(sin(theta), 0.0, cos(theta) * bladeNormal.z));
+}
+
+layout(location = 0) out vec4 outWorldPos;
+layout(location = 1) out vec4 outWorldNormal;
+
+
 void main()
 {
-    // Placeholder pass-through so this compiles standalone - wiring in an actual
-    // camera/model/per-instance transform (and wind) is a separate next step.
     vec3 localPos = bladeVertices[bladeIndices[gl_VertexIndex]];
-    gl_Position = vec4(localPos, 1.0);
+    vec3 localNormal = roundedBladeNormal(localPos.x);
+    vec4 worldPos = vec4(localPos + grassInstanceBuffer.grassInstanceData[gl_InstanceIndex].position, 1.0);
+    gl_Position = camera.proj * camera.view * worldPos;
+
+    outWorldPos = worldPos;
+    outWorldNormal = vec4(localNormal, 0.0);
 }

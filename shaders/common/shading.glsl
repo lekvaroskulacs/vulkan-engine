@@ -1,3 +1,4 @@
+#define CLUSTER_BUFFER_QUALIFIER readonly
 #include "common/scene_light.glsl"
 #include "common/cluster.glsl"
 

@@ -67,7 +67,7 @@ public:
     };
 
     explicit LightIndexBuffer(std::shared_ptr<Device> device)
-        : ComputeBuffer{ device, sizeof(SSBO) }
+        : ComputeBuffer{ device, sizeof(SSBO), vk::BufferUsageFlagBits::eTransferDst }
     {
     }
 };
