@@ -109,6 +109,7 @@ private:
 
         m_device->createImage(texWidth,
                               texHeight,
+                              vk::SampleCountFlagBits::e1,
                               vk::Format::eR8G8B8A8Srgb,
                               vk::ImageTiling::eOptimal,
                               vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,

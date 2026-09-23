@@ -124,6 +124,7 @@ vk::ImageView Device::createImageView(
 
 void Device::createImage(uint32_t width,
                          uint32_t height,
+                         vk::SampleCountFlagBits numSamples,
                          vk::Format format,
                          vk::ImageTiling tiling,
                          vk::ImageUsageFlags usage,
@@ -141,7 +142,7 @@ void Device::createImage(uint32_t width,
         .extent = extent,
         .mipLevels = 1,
         .arrayLayers = arrayLayers,
-        .samples = vk::SampleCountFlagBits::e1,
+        .samples = numSamples,
         .tiling = tiling,
         .usage = usage,
         .sharingMode = vk::SharingMode::eExclusive,
@@ -432,6 +433,7 @@ void Device::pickPhysicalDevice()
     if(candidates.rbegin()->first > 0)
     {
         m_physicalDevice = candidates.rbegin()->second;
+        m_msaaSamples = getMaxUsableSampleCount();
     }
     else
     {
@@ -528,6 +530,27 @@ void Device::initImGui(VkDescriptorPool descriptorPool, vk::RenderPass renderpas
             abort();
     };
     ImGui_ImplVulkan_Init(&init_info);
+}
+
+vk::SampleCountFlagBits Device::getMaxUsableSampleCount() 
+{
+    vk::PhysicalDeviceProperties physicalDeviceProperties;
+    m_physicalDevice.getProperties(&physicalDeviceProperties);
+
+    vk::SampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+    if (counts & vk::SampleCountFlagBits::e64) { return vk::SampleCountFlagBits::e64; }
+    if (counts & vk::SampleCountFlagBits::e32) { return vk::SampleCountFlagBits::e32; }
+    if (counts & vk::SampleCountFlagBits::e16) { return vk::SampleCountFlagBits::e16; }
+    if (counts & vk::SampleCountFlagBits::e8) { return vk::SampleCountFlagBits::e8; }
+    if (counts & vk::SampleCountFlagBits::e4) { return vk::SampleCountFlagBits::e4; }
+    if (counts & vk::SampleCountFlagBits::e2) { return vk::SampleCountFlagBits::e2; }
+
+    return vk::SampleCountFlagBits::e1;
+}
+
+vk::SampleCountFlagBits Device::GetMsaaSamples() 
+{
+    return m_msaaSamples;
 }
 
 } // namespace engine

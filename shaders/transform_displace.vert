@@ -16,17 +16,7 @@ layout(set = 1, binding = 0) uniform GameObject {
     mat4 proj;
 } ubo;
 
-const int noiseOctaves = 2;
-const float noiseScale = 0.05; // controls the "wavelength" of terrain features, in world units
-const float heightScale = 6.0;
-const float normalSampleEpsilon = 0.1; // finite-difference step, in world-space units (same
-                                        // units sampleHeight's output is in, unlike texcoord
-                                        // space - that mismatch was the cause of the black spots)
 
-float sampleHeight(vec2 worldXZ)
-{
-    return fbmNoise(worldXZ * noiseScale, noiseOctaves) * heightScale;
-}
 
 void main() {
     vec3 displacedPos = inPosition;

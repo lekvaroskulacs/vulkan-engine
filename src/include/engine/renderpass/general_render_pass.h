@@ -21,15 +21,20 @@ public:
 
 private:
     void createRenderPass();
+    void createColorResources();
     void createDepthResources();
     void createFrameBuffers();
     void cleanupFrameBufferResources();
 
     std::shared_ptr<SwapChain> m_swapChain;
-
+    
     vk::Image m_depthImage;
     VmaAllocation m_depthImageAllocation;
     vk::ImageView m_depthImageView;
+
+    vk::Image m_colorAttachmentResolve;
+    VmaAllocation m_colorAttachmentResolveAllocation;
+    vk::ImageView m_colorAttachmentResolveView;
 
     std::vector<vk::Framebuffer> m_framebuffers;
 };

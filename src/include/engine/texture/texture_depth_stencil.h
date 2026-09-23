@@ -21,6 +21,7 @@ public:
     {
         m_device->createImage(params.m_width,
                               params.m_height,
+                              vk::SampleCountFlagBits::e1,
                               params.m_depthFormat,
                               vk::ImageTiling::eOptimal,
                               vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eTransferSrc,

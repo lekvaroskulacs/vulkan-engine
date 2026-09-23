@@ -32,6 +32,7 @@ void main()
         float angle = rand.x * 6.2831853;
         float radius = sqrt(rand.y) * clumpRadius;
         vec3 offset = vec3(cos(angle) * radius, 0.0, sin(angle) * radius);
+        offset.y = sampleHeight(clumpCenter.xz + offset.xz);
 
         float facingAngle = float(noiseHash(i * 2654435761u + 0x85ebca6bu)) / 4294967296.0 * 6.2831853;
 

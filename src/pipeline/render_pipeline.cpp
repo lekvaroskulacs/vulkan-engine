@@ -81,7 +81,7 @@ void PipelineRender::createPipeline(const ShaderCodePaths& paths)
     };
 
     vk::PipelineMultisampleStateCreateInfo multisampling{
-        .rasterizationSamples = vk::SampleCountFlagBits::e1,
+        .rasterizationSamples = m_device->GetMsaaSamples(),
         .sampleShadingEnable = vk::False,
         .minSampleShading = 1.0f,
         .pSampleMask = nullptr,

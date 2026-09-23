@@ -27,6 +27,7 @@ GeneralRenderPass::GeneralRenderPass(std::shared_ptr<Device> device, std::shared
     , m_swapChain{swapChain}
 {
     createRenderPass();
+    createColorResources();
     createDepthResources();
     createFrameBuffers();
 }
@@ -39,6 +40,7 @@ GeneralRenderPass::~GeneralRenderPass()
 void GeneralRenderPass::recreate()
 {
     cleanupFrameBufferResources();
+    createColorResources();
     createDepthResources();
     createFrameBuffers();
 }
@@ -46,18 +48,18 @@ void GeneralRenderPass::recreate()
 void GeneralRenderPass::createRenderPass()
 {
     vk::AttachmentDescription colorAttachment{.format = m_swapChain->GetImageFormat(),
-                                              .samples = vk::SampleCountFlagBits::e1,
+                                              .samples = m_device->GetMsaaSamples(),
                                               .loadOp = vk::AttachmentLoadOp::eClear,
                                               .storeOp = vk::AttachmentStoreOp::eStore,
                                               .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
                                               .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
                                               .initialLayout = vk::ImageLayout::eUndefined,
-                                              .finalLayout = vk::ImageLayout::ePresentSrcKHR};
+                                              .finalLayout = vk::ImageLayout::eColorAttachmentOptimal};
 
     vk::AttachmentReference colorAttachmentRef{.attachment = 0, .layout = vk::ImageLayout::eColorAttachmentOptimal};
 
     vk::AttachmentDescription depthAttachment{.format = m_device->findDepthFormat(),
-                                              .samples = vk::SampleCountFlagBits::e1,
+                                              .samples = m_device->GetMsaaSamples(),
                                               .loadOp = vk::AttachmentLoadOp::eClear,
                                               .storeOp = vk::AttachmentStoreOp::eDontCare,
                                               .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
@@ -67,10 +69,22 @@ void GeneralRenderPass::createRenderPass()
 
     vk::AttachmentReference depthAttachmentRef{.attachment = 1, .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal};
 
+    vk::AttachmentDescription colorAttachmentResolve{.format = m_swapChain->GetImageFormat(),
+                                                    .samples = vk::SampleCountFlagBits::e1,
+                                                    .loadOp = vk::AttachmentLoadOp::eDontCare,
+                                                    .storeOp = vk::AttachmentStoreOp::eStore,
+                                                    .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+                                                    .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+                                                    .initialLayout = vk::ImageLayout::eUndefined,
+                                                    .finalLayout = vk::ImageLayout::ePresentSrcKHR};
+
+    vk::AttachmentReference colorAttachmentResolveRef{.attachment = 2, .layout = vk::ImageLayout::eColorAttachmentOptimal};
+
     vk::SubpassDescription subpass{
         .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
         .colorAttachmentCount = 1,
         .pColorAttachments = &colorAttachmentRef,
+        .pResolveAttachments = &colorAttachmentResolveRef,
         .pDepthStencilAttachment = &depthAttachmentRef,
     };
 
@@ -79,10 +93,10 @@ void GeneralRenderPass::createRenderPass()
         .dstSubpass = 0,
         .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eLateFragmentTests,
         .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
-        .srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+        .srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eColorAttachmentWrite,
         .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite};
 
-    std::array<vk::AttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
+    std::array<vk::AttachmentDescription, 3> attachments = {colorAttachment, depthAttachment, colorAttachmentResolve};
     vk::RenderPassCreateInfo renderPassInfo{.attachmentCount = static_cast<uint32_t>(attachments.size()),
                                             .pAttachments = attachments.data(),
                                             .subpassCount = 1,
@@ -96,12 +110,29 @@ void GeneralRenderPass::createRenderPass()
     }
 }
 
+void GeneralRenderPass::createColorResources()
+{
+    vk::Format colorFormat = m_swapChain->GetImageFormat();
+
+    m_device->createImage(m_swapChain->GetExtent().width,
+                          m_swapChain->GetExtent().height,
+                          m_device->GetMsaaSamples(),
+                          colorFormat,
+                          vk::ImageTiling::eOptimal,
+                          vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment,
+                          vk::MemoryPropertyFlagBits::eDeviceLocal,
+                          m_colorAttachmentResolve,
+                          m_colorAttachmentResolveAllocation);
+    m_colorAttachmentResolveView = m_device->createImageView(m_colorAttachmentResolve, colorFormat, vk::ImageAspectFlagBits::eColor);
+}
+
 void GeneralRenderPass::createDepthResources()
 {
     vk::Format depthFormat = m_device->findDepthFormat();
 
     m_device->createImage(m_swapChain->GetExtent().width,
                           m_swapChain->GetExtent().height,
+                          m_device->GetMsaaSamples(),
                           depthFormat,
                           vk::ImageTiling::eOptimal,
                           vk::ImageUsageFlagBits::eDepthStencilAttachment,
@@ -118,7 +149,7 @@ void GeneralRenderPass::createFrameBuffers()
 
     for(size_t i = 0; i < imageViews.size(); i++)
     {
-        std::array<vk::ImageView, 2> attachments = {imageViews[i], m_depthImageView};
+        std::array<vk::ImageView, 3> attachments = {imageViews[i], m_depthImageView, m_colorAttachmentResolveView};
 
         vk::FramebufferCreateInfo frameBufferInfo{.renderPass = m_renderPass,
                                                   .attachmentCount = static_cast<uint32_t>(attachments.size()),
@@ -136,6 +167,9 @@ void GeneralRenderPass::createFrameBuffers()
 
 void GeneralRenderPass::cleanupFrameBufferResources()
 {
+    m_device->GetDevice().destroyImageView(m_colorAttachmentResolveView, nullptr);
+    m_device->destroyImage(m_colorAttachmentResolve, m_colorAttachmentResolveAllocation);
+
     m_device->GetDevice().destroyImageView(m_depthImageView, nullptr);
     m_device->destroyImage(m_depthImage, m_depthImageAllocation);
 

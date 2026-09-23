@@ -49,6 +49,7 @@ public:
     vk::SurfaceKHR GetSurface();
     vk::Queue GetPresentQueue();
     vk::Queue GetGraphicsQueue();
+    vk::SampleCountFlagBits GetMsaaSamples();
 
     explicit Device(std::shared_ptr<Window> window);
     ~Device();
@@ -72,6 +73,7 @@ public:
                                   vk::ImageViewType viewType = vk::ImageViewType::e2D);
     void createImage(uint32_t width,
                      uint32_t height,
+                     vk::SampleCountFlagBits numSamples,
                      vk::Format format,
                      vk::ImageTiling tiling,
                      vk::ImageUsageFlags usage,
@@ -84,6 +86,8 @@ public:
 
     vk::Format findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
     vk::Format findDepthFormat();
+
+    vk::SampleCountFlagBits getMaxUsableSampleCount();
 
 private:
     static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -112,6 +116,7 @@ private:
     vk::Queue m_presentQueue;
     vk::Queue m_computeQueue;
     vk::SurfaceKHR m_surface;
+    vk::SampleCountFlagBits m_msaaSamples = vk::SampleCountFlagBits::e1;
 
 public:
     VmaAllocator m_allocator;
