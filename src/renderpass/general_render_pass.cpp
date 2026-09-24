@@ -149,7 +149,7 @@ void GeneralRenderPass::createFrameBuffers()
 
     for(size_t i = 0; i < imageViews.size(); i++)
     {
-        std::array<vk::ImageView, 3> attachments = {imageViews[i], m_depthImageView, m_colorAttachmentResolveView};
+        std::array<vk::ImageView, 3> attachments = {m_colorAttachmentResolveView, m_depthImageView, imageViews[i]};
 
         vk::FramebufferCreateInfo frameBufferInfo{.renderPass = m_renderPass,
                                                   .attachmentCount = static_cast<uint32_t>(attachments.size()),

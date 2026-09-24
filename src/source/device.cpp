@@ -521,7 +521,7 @@ void Device::initImGui(VkDescriptorPool descriptorPool, vk::RenderPass renderpas
     init_info.Allocator = nullptr;
     init_info.PipelineInfoMain.RenderPass = renderpass;
     init_info.PipelineInfoMain.Subpass = 0;
-    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    init_info.PipelineInfoMain.MSAASamples = static_cast<VkSampleCountFlagBits>(m_msaaSamples);
     init_info.CheckVkResultFn = [](VkResult err) {
         if(err == VK_SUCCESS)
             return;
