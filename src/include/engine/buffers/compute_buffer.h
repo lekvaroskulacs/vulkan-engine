@@ -91,10 +91,15 @@ public:
     }
 };
 
+
 struct GrassInstanceData
 {
     alignas(16) glm::vec3 position;
     alignas(16) glm::vec2 facing;
+    float height;
+    float width;
+    float tilt;
+    float bend;
 };
 
 class GrassInstanceDataBuffer : public ComputeBuffer

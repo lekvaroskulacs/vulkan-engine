@@ -16,6 +16,12 @@ vec2 randomUnit(uint seed)
     return vec2(float(hx), float(hy)) / 4294967296.0;
 }
 
+float randomFloat(uint seed, uint saltOffset, float minVal, float maxVal)
+{
+    float t = float(noiseHash(seed * 2654435761u + saltOffset)) / 4294967296.0;
+    return mix(minVal, maxVal, t);
+}
+
 void main()
 {
     grassData.vertexCount = 39;
@@ -38,5 +44,9 @@ void main()
 
         grassInstanceBuffer.grassInstanceData[i].position = clumpCenter + offset;
         grassInstanceBuffer.grassInstanceData[i].facing = vec2(cos(facingAngle), sin(facingAngle));
+        grassInstanceBuffer.grassInstanceData[i].height = randomFloat(i, 0x27d4eb2fu, 0.7, 1.3);
+        grassInstanceBuffer.grassInstanceData[i].width = randomFloat(i, 0x165667b1u, 0.1, 0.12);
+        grassInstanceBuffer.grassInstanceData[i].tilt = randomFloat(i, 0xd3a2646cu, radians(10.0), radians(20.0));
+        grassInstanceBuffer.grassInstanceData[i].bend = 0.0; // unused so far
     }
 }

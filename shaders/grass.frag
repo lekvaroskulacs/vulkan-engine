@@ -16,6 +16,6 @@ void main()
     vec3 x = worldPos.xyz / worldPos.w;
 
     vec3 ambient = vec3(0.0, 0.9, 0.61);
-    vec3 radiance = iterateLightsClustered(x, normal);
+    vec3 radiance = iterateLights(x, normal);
     outColor = vec4(ambient * radiance, 1.0);
 }

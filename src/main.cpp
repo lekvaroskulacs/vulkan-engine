@@ -294,7 +294,7 @@ private:
             std::vector<engine::PerMeshRenderData> params_list;
             params_list.push_back(m_skybox->getDrawFrameParams());
             //params_list.push_back(m_testInterior->getDrawFrameParams());
-            params_list.push_back(m_skull->getDrawFrameParams());
+            //params_list.push_back(m_skull->getDrawFrameParams());
             params_list.push_back(m_terrain->getDrawFrameParams());
 
             engine::DrawFrameData data

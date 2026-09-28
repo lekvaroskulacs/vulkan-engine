@@ -7,6 +7,11 @@ struct GrassInstanceData
 {
     vec3 position;
     vec2 facing;
+    
+    float height;
+    float width;
+    float tilt;
+    float bend;
 };
 
 // Layout matches VkDrawIndirectCommand so this buffer can be bound directly as the
