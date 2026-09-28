@@ -67,14 +67,45 @@ vec3 roundedBladeNormal(float localX)
 layout(location = 0) out vec4 outWorldPos;
 layout(location = 1) out vec4 outWorldNormal;
 
+const float widenStrength = 1.5;
 
 void main()
 {
     vec3 localPos = bladeVertices[bladeIndices[gl_VertexIndex]];
     vec3 localNormal = roundedBladeNormal(localPos.x);
-    vec4 worldPos = vec4(localPos + grassInstanceBuffer.grassInstanceData[gl_InstanceIndex].position, 1.0);
+    vec2 dir = grassInstanceBuffer.grassInstanceData[gl_InstanceIndex].facing;
+    vec3 facing = vec3(dir.x, 0.0, dir.y);
+    float angle = acos(dot(facing, bladeNormal));
+    mat3 rotation = mat3(
+        cos(angle), 0, sin(angle),
+        0, 1, 0,
+        -sin(angle), 0, cos(angle)
+    );
+
+    vec4 worldPos = vec4(rotation * localPos + grassInstanceBuffer.grassInstanceData[gl_InstanceIndex].position, 1.0);
+    vec3 worldNormal = rotation * localNormal;
+
+    vec3 worldWidthAxis = rotation * vec3(1.0, 0.0, 0.0);
+    mat3 viewRotation = mat3(camera.view);
+    // Get the width axis in view space
+    vec3 viewWidthAxis = normalize(viewRotation * worldWidthAxis);
+
+    // How much the width axis is foreshortened by pointing toward/away from the camera
+    // (view-space z) instead of lying across the screen - i.e. how edge-on the blade looks.
+    // This is the quantity that actually matters for "is the blade's width about to vanish
+    // on screen", which is subtly different from how perpendicular its normal is to viewDir.
+    float edgeOnFactor = viewWidthAxis.z;
+
+    // Push the vertex along view-space x (screen-horizontal) to make up for the width lost to
+    // foreshortening, then fold that offset back into worldPos - the view matrix's rotation
+    // part is orthonormal, so its transpose is its inverse, cheaper than a full matrix
+    // inverse - so the fragment shader's lighting sample point matches where the vertex
+    // actually ends up instead of its pre-widening position.
+    float extraOffset = localPos.x * edgeOnFactor * widenStrength;
+    worldPos.xyz += transpose(viewRotation) * vec3(extraOffset, 0.0, 0.0);
+
     gl_Position = camera.proj * camera.view * worldPos;
 
     outWorldPos = worldPos;
-    outWorldNormal = vec4(localNormal, 0.0);
+    outWorldNormal = vec4(worldNormal, 0.0);
 }

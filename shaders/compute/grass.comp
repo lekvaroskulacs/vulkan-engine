@@ -5,8 +5,8 @@
 
 layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-const uint grassInstanceCount = 10000;
-const float clumpRadius = 10.0;
+const uint grassInstanceCount = 40000;
+const float clumpRadius = 30.0;
 const vec3 clumpCenter = vec3(0.0, 0.0, 0.0);
 
 vec2 randomUnit(uint seed)
