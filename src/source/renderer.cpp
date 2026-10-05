@@ -62,7 +62,8 @@ void recordFrameBeginCompute(vk::CommandBuffer commandBuffer, const DrawFrameDat
     auto& buildGrassPipeline = data.m_frameBeginComputeSteps.at(ComputeStage::BuildGrass);
     commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, buildGrassPipeline->Get());
     commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, buildGrassPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
-    commandBuffer.dispatch(1, 1, 1);
+    uint32_t grassGroups = (grass::instanceCount + grass::localSizeX - 1) / grass::localSizeX;
+    commandBuffer.dispatch(grassGroups, 1, 1);
 
     vk::MemoryBarrier buildGrassBarrier{
         .srcAccessMask = vk::AccessFlagBits::eShaderWrite,

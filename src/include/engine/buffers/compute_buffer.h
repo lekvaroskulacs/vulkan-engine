@@ -72,6 +72,13 @@ public:
     }
 };
 
+namespace grass {
+// Keep in sync with grassInstanceCount in shaders/compute/grass.comp.
+constexpr uint32_t instanceCount = 10000;
+// Keep in sync with local_size_x in shaders/compute/grass.comp.
+constexpr uint32_t localSizeX = 256;
+}
+
 // Layout matches VkDrawIndirectCommand exactly, so this buffer can be written by
 // grass.comp and then fed straight into vkCmdDrawIndirect as the indirect-args buffer.
 class GrassDataBuffer : public ComputeBuffer
