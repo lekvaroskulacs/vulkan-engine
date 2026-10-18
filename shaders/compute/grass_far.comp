@@ -1,0 +1,28 @@
+#version 450
+
+#define GRASS_FAR
+#include "common/noise.glsl"
+#include "common/grass.glsl"
+#include "common/scene_light.glsl"
+#include "common/grass_tile.glsl"
+
+// Keep in sync with grass::coarse::instancesPerTileAxis in src/include/engine/buffers/compute_buffer.h.
+layout (local_size_x = instancesPerTileAxis, local_size_y = instancesPerTileAxis, local_size_z = 1) in;
+
+void main()
+{
+    // One workgroup per tile: gl_WorkGroupID picks the tile, gl_LocalInvocationID picks this
+    // lane's cell within that tile's instancesPerTileAxis x instancesPerTileAxis sub-grid.
+    uint flatIndex = instanceOffset + gl_GlobalInvocationID.y * (numTilesX * instancesPerTileAxis) + gl_GlobalInvocationID.x;
+
+    placeGrassInstance(gl_WorkGroupID.xy,
+                       gl_LocalInvocationID.xy,
+                       flatIndex,
+                       tileSize,
+                       numTilesX,
+                       numTilesZ,
+                       instancesPerTileAxis,
+                       lod,
+                       lodDistanceThreshold,
+                       camera.position.xyz);
+}

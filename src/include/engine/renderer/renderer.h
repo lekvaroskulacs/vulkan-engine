@@ -44,7 +44,8 @@ enum class ComputeStage
 {
     BuildClusterGrid,
     CullLights,
-    BuildGrass
+    BuildGrassNear,
+    BuildGrassFar
 };
 
 struct DrawFrameData

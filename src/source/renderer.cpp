@@ -59,11 +59,17 @@ void recordFrameBeginCompute(vk::CommandBuffer commandBuffer, const DrawFrameDat
                                   0, nullptr,
                                   0, nullptr);
 
-    auto& buildGrassPipeline = data.m_frameBeginComputeSteps.at(ComputeStage::BuildGrass);
-    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, buildGrassPipeline->Get());
-    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, buildGrassPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
-    uint32_t grassGroups = (grass::instanceCount + grass::localSizeX - 1) / grass::localSizeX;
-    commandBuffer.dispatch(grassGroups, 1, 1);
+    // One workgroup per tile for each grid; the near (fine) pass also writes GrassData's
+    // shared fields (instanceCount covers both passes), so it must run before the far pass.
+    auto& buildGrassNearPipeline = data.m_frameBeginComputeSteps.at(ComputeStage::BuildGrassNear);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, buildGrassNearPipeline->Get());
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, buildGrassNearPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
+    commandBuffer.dispatch(grass::fine::numTilesX, grass::fine::numTilesZ, 1);
+
+    auto& buildGrassFarPipeline = data.m_frameBeginComputeSteps.at(ComputeStage::BuildGrassFar);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, buildGrassFarPipeline->Get());
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, buildGrassFarPipeline->GetLayout(), 0, 1, &globalSet, 0, 0);
+    commandBuffer.dispatch(grass::coarse::numTilesX, grass::coarse::numTilesZ, 1);
 
     vk::MemoryBarrier buildGrassBarrier{
         .srcAccessMask = vk::AccessFlagBits::eShaderWrite,

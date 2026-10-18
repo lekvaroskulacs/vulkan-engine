@@ -1,0 +1,37 @@
+#version 450
+
+#include "common/noise.glsl"
+#include "common/grass.glsl"
+#include "common/scene_light.glsl"
+#include "common/grass_tile.glsl"
+
+// Keep in sync with grass::fine::instancesPerTileAxis in src/include/engine/buffers/compute_buffer.h.
+layout (local_size_x = instancesPerTileAxis, local_size_y = instancesPerTileAxis, local_size_z = 1) in;
+
+void main()
+{
+    // Only the very first lane needs to set these - they're the same for every instance
+    // across both the near and far passes.
+    if (gl_GlobalInvocationID.x == 0 && gl_GlobalInvocationID.y == 0)
+    {
+        grassData.instanceCount = totalInstanceCount;
+        grassData.firstVertex = 0;
+        grassData.firstInstance = 0;
+        grassData.vertexCount = vertexCountLOD0;
+    }
+
+    // One workgroup per tile: gl_WorkGroupID picks the tile, gl_LocalInvocationID picks this
+    // lane's cell within that tile's instancesPerTileAxis x instancesPerTileAxis sub-grid.
+    uint flatIndex = gl_GlobalInvocationID.y * (numTilesX * instancesPerTileAxis) + gl_GlobalInvocationID.x;
+
+    placeGrassInstance(gl_WorkGroupID.xy,
+                       gl_LocalInvocationID.xy,
+                       flatIndex,
+                       tileSize,
+                       numTilesX,
+                       numTilesZ,
+                       instancesPerTileAxis,
+                       lod,
+                       lodDistanceThreshold,
+                       camera.position.xyz);
+}

@@ -73,10 +73,32 @@ public:
 };
 
 namespace grass {
-// Keep in sync with grassInstanceCount in shaders/compute/grass.comp.
-constexpr uint32_t instanceCount = 160000;
-// Keep in sync with local_size_x in shaders/compute/grass.comp.
-constexpr uint32_t localSizeX = 256;
+// Keep in sync with lodDistanceThreshold in shaders/compute/grass_near.comp and
+// shaders/compute/grass_far.comp.
+constexpr float lodDistanceThreshold = 10.0f;
+
+namespace fine {
+// Keep in sync with numTilesX/numTilesZ/tileSize/instancesPerTileAxis in
+// shaders/compute/grass_near.comp.
+constexpr uint32_t numTilesX = 20;
+constexpr uint32_t numTilesZ = 20;
+constexpr float tileSize = 10.0f;
+constexpr uint32_t instancesPerTileAxis = 30; // local_size_x/y in grass_near.comp
+constexpr uint32_t instanceCount = numTilesX * numTilesZ * instancesPerTileAxis * instancesPerTileAxis;
+}
+
+namespace coarse {
+// Tiles are twice fine::tileSize with the same lane count per tile, so numTilesX * tileSize
+// matches fine:: exactly (same world footprint) at a quarter of the blade density - like
+// one mip level down. Keep in sync with shaders/compute/grass_far.comp.
+constexpr uint32_t numTilesX = fine::numTilesX / 2;
+constexpr uint32_t numTilesZ = fine::numTilesZ / 2;
+constexpr float tileSize = fine::tileSize * 2.0f;
+constexpr uint32_t instancesPerTileAxis = 30; // local_size_x/y in grass_far.comp
+constexpr uint32_t instanceCount = numTilesX * numTilesZ * instancesPerTileAxis * instancesPerTileAxis;
+}
+
+constexpr uint32_t instanceCount = fine::instanceCount + coarse::instanceCount;
 }
 
 // Layout matches VkDrawIndirectCommand exactly, so this buffer can be written by
@@ -115,7 +137,7 @@ class GrassInstanceDataBuffer : public ComputeBuffer
 public:
     struct SSBO
     {
-        GrassInstanceData m_instances[100000]; // TODO: make this dynamic
+        GrassInstanceData m_instances[grass::instanceCount];
     };
 
     explicit GrassInstanceDataBuffer(std::shared_ptr<Device> device)

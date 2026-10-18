@@ -86,8 +86,10 @@ public:
         m_buildClustersPipeline = std::make_unique<engine::PipelineCompute>(m_device, computeParams, m_globalSet->GetLayout());
         computeParams.m_shaderPaths.m_computeShaderPath = "shaders/compute/light_cull.comp";
         m_cullLightsPipeline = std::make_unique<engine::PipelineCompute>(m_device, computeParams, m_globalSet->GetLayout());
-        computeParams.m_shaderPaths.m_computeShaderPath = "shaders/compute/grass.comp";
-        m_buildGrassPipeline = std::make_unique<engine::PipelineCompute>(m_device, computeParams, m_globalSet->GetLayout());
+        computeParams.m_shaderPaths.m_computeShaderPath = "shaders/compute/grass_near.comp";
+        m_buildGrassNearPipeline = std::make_unique<engine::PipelineCompute>(m_device, computeParams, m_globalSet->GetLayout());
+        computeParams.m_shaderPaths.m_computeShaderPath = "shaders/compute/grass_far.comp";
+        m_buildGrassFarPipeline = std::make_unique<engine::PipelineCompute>(m_device, computeParams, m_globalSet->GetLayout());
 
         auto grassParams = engine::CreatePipelineParams{
             .m_shaderPaths = {
@@ -254,7 +256,8 @@ private:
 
     std::unique_ptr<engine::PipelineCompute> m_buildClustersPipeline;
     std::unique_ptr<engine::PipelineCompute> m_cullLightsPipeline;
-    std::unique_ptr<engine::PipelineCompute> m_buildGrassPipeline;
+    std::unique_ptr<engine::PipelineCompute> m_buildGrassNearPipeline;
+    std::unique_ptr<engine::PipelineCompute> m_buildGrassFarPipeline;
 
     std::unique_ptr<engine::PipelineGrass> m_grassPipeline;
 
@@ -312,7 +315,8 @@ private:
                 .m_frameBeginComputeSteps = {
                     {engine::ComputeStage::BuildClusterGrid, m_buildClustersPipeline.get()},
                     {engine::ComputeStage::CullLights, m_cullLightsPipeline.get()},
-                    {engine::ComputeStage::BuildGrass, m_buildGrassPipeline.get()},
+                    {engine::ComputeStage::BuildGrassNear, m_buildGrassNearPipeline.get()},
+                    {engine::ComputeStage::BuildGrassFar, m_buildGrassFarPipeline.get()},
                 },
                 .m_renderData = params_list,
                 .m_indirectRenderData = {m_grassPipeline.get()}
