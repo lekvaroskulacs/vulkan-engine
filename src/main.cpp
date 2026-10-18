@@ -213,14 +213,24 @@ public:
                     mvp->updateBuffer(&ubo, currentImage);
                 }
             });
-        // m_terrain->addTexture<engine::Texture2D, engine::Texture2DParams>(
-        //     1, vk::ShaderStageFlagBits::eVertex, std::move(engine::Texture2DParams{.m_filepath = "textures/hills_height.png"}));
-        // m_terrain->addTexture<engine::Texture2D, engine::Texture2DParams>(
-        //     2, vk::ShaderStageFlagBits::eVertex, std::move(engine::Texture2DParams{.m_filepath = "textures/hills_height_normal.png"}));
+        m_terrain->addTexture<engine::Texture2D, engine::Texture2DParams>(
+            1, vk::ShaderStageFlagBits::eFragment, std::move(engine::Texture2DParams{.m_filepath = "textures/grass_ground_diff_1k.jpg"}));
+        m_terrain->addUniform<engine::UniformMaterial>(
+            2, vk::ShaderStageFlagBits::eFragment, [&](engine::UpdatableBuffer& uniform, int currentImage) {
+                auto* mat = dynamic_cast<engine::UniformMaterial*>(&uniform);
+                if(mat)
+                {
+                    engine::UniformMaterial::UniformBufferObject ubo{};
+                    ubo.textureOffset = glm::vec2{0.0f};
+                    ubo.textureTiling = glm::vec2{10.0f};
+                    ubo.roughness = 1.0f;
+                    mat->updateBuffer(&ubo, currentImage);
+                }
+            });
         m_terrain->finalizeGameObject(
             m_renderPasses,
             *m_globalSet,
-            {.m_vertexShaderPath = "shaders/transform_displace.vert", .m_fragmentShaderPath = "shaders/max_blinn.frag"});
+            {.m_vertexShaderPath = "shaders/transform_displace.vert", .m_fragmentShaderPath = "shaders/textured_max_blinn.frag"});
 
     }
 

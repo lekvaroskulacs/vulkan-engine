@@ -152,6 +152,86 @@ vec3 bladeNormalLOD0(GrassInstanceData data, uint index)
     return roundedBladeNormal(flatNormal, localX, halfWidth);
 }
 
+const int numSegmentsLOD1 = 2;
+const int numVerticesLOD1 = 7;
+const int vertsMaxIndexLOD1 = numVerticesLOD1 - 1;
+const int numRowsLOD1 = numSegmentsLOD1 + 1; // 3 rows (0..2)
+
+// Same two-triangles-per-quad-plus-apex layout as bladeIndices, just with one fewer quad:
+// 2 quads * 2 + 1 = 5 triangles = 15 indices.
+const int bladeIndicesLOD1[15] = int[15](
+    0, 1, 2,    1, 3, 2,
+    2, 3, 4,    3, 5, 4,
+    4, 5, 6
+);
+const int bladeIndicesLOD1MaxIndex = 15 - 1;
+
+// Structural mirror of bladeVertexLOD0, just with numRowsLOD1/vertsMaxIndexLOD1/
+// bladeIndicesLOD1 instead - same per-instance width/height/tilt/bend, same bezier bend,
+// just fewer rows sampled along it.
+vec3 bladeVertexLOD1(GrassInstanceData data, uint index)
+{
+    int vertIdx = bladeIndicesLOD1[index];
+    float halfWidth = data.width * 0.5;
+    float rowHeight = data.height / float(numSegmentsLOD1);
+
+    vec3 vert;
+    if (vertIdx == vertsMaxIndexLOD1)
+    {
+        vert = vec3(0.0, data.height, 0.0);
+    }
+    else
+    {
+        int row = vertIdx / 2;
+        float taper = 1.0 - float(row) / float(numRowsLOD1);
+        float x = halfWidth * taper;
+        bool isRight = (vertIdx % 2) == 1;
+        vert = vec3(isRight ? x : -x, float(row) * rowHeight, 0.0);
+    }
+
+    vec3 p0, p1, p2;
+    float w0, w1, w2;
+    getBezierControlPoints(data, p0, p1, p2);
+    float t = vert.y / data.height;
+    getBezierWeights(t, w0, w1, w2);
+
+    vec3 bezierPoint = w0 * p0 + w1 * p1 + w2 * p2;
+    vert.yz = bezierPoint.yz;
+
+    return vert;
+}
+
+// Structural mirror of bladeNormalLOD0 - see bladeVertexLOD1 above.
+vec3 bladeNormalLOD1(GrassInstanceData data, uint index)
+{
+    int vertIdx = bladeIndicesLOD1[index];
+    float halfWidth = data.width * 0.5;
+
+    float localX;
+    float t;
+    if (vertIdx == vertsMaxIndexLOD1)
+    {
+        localX = 0.0;
+        t = 1.0;
+    }
+    else
+    {
+        int row = vertIdx / 2;
+        float taper = 1.0 - float(row) / float(numRowsLOD1);
+        bool isRight = (vertIdx % 2) == 1;
+        localX = isRight ? halfWidth * taper : -halfWidth * taper;
+        t = float(row) / float(numSegmentsLOD1);
+    }
+
+    vec3 p0, p1, p2;
+    getBezierControlPoints(data, p0, p1, p2);
+    vec3 tangent = getBezierTangent(p0, p1, p2, t);
+
+    vec3 flatNormal = normalize(vec3(0.0, -tangent.z, tangent.y));
+
+    return roundedBladeNormal(flatNormal, localX, halfWidth);
+}
+
 layout(location = 0) out vec4 outWorldPos;
 layout(location = 1) out vec4 outWorldNormal;
 
@@ -161,8 +241,10 @@ void main()
 {
     GrassInstanceData data = grassInstanceBuffer.grassInstanceData[gl_InstanceIndex];
 
-    vec3 localPos = bladeVertexLOD0(data, gl_VertexIndex);
-    vec3 localNormal = bladeNormalLOD0(data, gl_VertexIndex);
+    // clamping the index makes zero-area triangles which do not get rendered anyway - no perf loss
+    uint lod1Index = min(gl_VertexIndex, uint(bladeIndicesLOD1MaxIndex));
+    vec3 localPos = data.lod == 0 ? bladeVertexLOD0(data, gl_VertexIndex) : bladeVertexLOD1(data, lod1Index);
+    vec3 localNormal = data.lod == 0 ? bladeNormalLOD0(data, gl_VertexIndex) : bladeNormalLOD1(data, lod1Index);
 
     vec3 facing = vec3(data.facing.x, 0.0, data.facing.y);
     float angle = acos(dot(facing, bladeNormal));

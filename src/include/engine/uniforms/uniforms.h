@@ -135,4 +135,21 @@ public:
     }
 };
 
+class UniformMaterial : public Uniform
+{
+public:
+    struct UniformBufferObject
+    {
+        alignas(8) glm::vec2 textureOffset;
+        alignas(8) glm::vec2 textureTiling;
+        alignas(4) float roughness;
+    };
+
+    explicit UniformMaterial(std::shared_ptr<Device> device)
+        : Uniform(device, sizeof(UniformBufferObject))
+    {
+    }
+};
+
+
 } // namespace engine

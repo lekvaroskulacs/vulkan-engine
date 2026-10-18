@@ -74,7 +74,7 @@ public:
 
 namespace grass {
 // Keep in sync with grassInstanceCount in shaders/compute/grass.comp.
-constexpr uint32_t instanceCount = 10000;
+constexpr uint32_t instanceCount = 160000;
 // Keep in sync with local_size_x in shaders/compute/grass.comp.
 constexpr uint32_t localSizeX = 256;
 }
@@ -107,6 +107,7 @@ struct GrassInstanceData
     float width;
     float tilt;
     float bend;
+    float lod;
 };
 
 class GrassInstanceDataBuffer : public ComputeBuffer
